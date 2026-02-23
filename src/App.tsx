@@ -56,7 +56,7 @@ function MapUpdater({ center, follow }: { center: [number, number], follow: bool
     // Fix for partial map loading - multiple attempts to ensure size is correct
     const timer = setInterval(() => {
       map.invalidateSize();
-    }, 1000);
+    }, 500);
     
     // Also run immediately
     map.invalidateSize();
@@ -66,7 +66,7 @@ function MapUpdater({ center, follow }: { center: [number, number], follow: bool
 
   useEffect(() => {
     if (follow) {
-      map.setView(center, map.getZoom());
+      map.setView(center, map.getZoom(), { animate: true });
     }
   }, [center, map, follow]);
   return null;
@@ -398,6 +398,7 @@ export default function App() {
               scrollWheelZoom={true}
               boxZoom={true}
               keyboard={true}
+              preferCanvas={true}
             >
               <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
