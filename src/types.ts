@@ -12,4 +12,5 @@ export interface SessionStats {
   avgSpeed: number; // in m/s
   totalTime: number; // in ms
   elevationGain: number; // in meters
+  elevationLoss: number; // in meters
 }

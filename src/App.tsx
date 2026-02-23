@@ -51,6 +51,14 @@ const calculateDistance = (p1: { lat: number, lng: number }, p2: { lat: number, 
 
 function MapUpdater({ center, follow }: { center: [number, number], follow: boolean }) {
   const map = useMap();
+  
+  useEffect(() => {
+    // Fix for partial map loading
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+  }, [map]);
+
   useEffect(() => {
     if (follow) {
       map.setView(center, map.getZoom());
@@ -73,7 +81,8 @@ export default function App() {
     maxSpeed: 0,
     avgSpeed: 0,
     totalTime: 0,
-    elevationGain: 0
+    elevationGain: 0,
+    elevationLoss: 0
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -125,7 +134,8 @@ export default function App() {
         maxSpeed: 0,
         avgSpeed: 0,
         totalTime: 0,
-        elevationGain: 0
+        elevationGain: 0,
+        elevationLoss: 0
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -155,13 +165,22 @@ export default function App() {
               const currentStats = statsRef.current;
               const newDistance = currentStats.distance + d;
               const newMaxSpeed = Math.max(currentStats.maxSpeed, speed || 0);
-              const elevationDiff = altitude && lastPoint.altitude ? Math.max(0, altitude - lastPoint.altitude) : 0;
+              
+              let elevationGain = currentStats.elevationGain;
+              let elevationLoss = currentStats.elevationLoss;
+              
+              if (altitude !== null && lastPoint.altitude !== null) {
+                const diff = altitude - lastPoint.altitude;
+                if (diff > 0.5) elevationGain += diff; // Filter small noise
+                if (diff < -0.5) elevationLoss += Math.abs(diff);
+              }
               
               const updatedStats = {
                 ...currentStats,
                 distance: newDistance,
                 maxSpeed: newMaxSpeed,
-                elevationGain: currentStats.elevationGain + elevationDiff,
+                elevationGain,
+                elevationLoss,
                 avgSpeed: newDistance / ((Date.now() - (startTimeRef.current || Date.now())) / 1000)
               };
 
@@ -289,9 +308,17 @@ export default function App() {
             </p>
           </div>
         </div>
-        <div className="flex flex-col items-end">
-          <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">Duration</span>
-          <span className="text-lg font-mono font-bold text-emerald-400 leading-none">{formatTime(elapsedTime)}</span>
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">Speed</span>
+            <span className="text-lg font-mono font-bold text-emerald-400 leading-none">
+              {formatSpeed(route[route.length - 1]?.speed || 0)} <span className="text-[10px]">km/h</span>
+            </span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">Duration</span>
+            <span className="text-lg font-mono font-bold text-emerald-400 leading-none">{formatTime(elapsedTime)}</span>
+          </div>
         </div>
       </header>
 
@@ -398,20 +425,20 @@ export default function App() {
             icon={<Navigation className="w-3.5 h-3.5" />} 
           />
           <StatCard 
-            label="Speed" 
-            value={formatSpeed(route[route.length - 1]?.speed || 0)} 
-            unit="km/h" 
-            icon={<Zap className="w-3.5 h-3.5" />} 
+            label="Altitude" 
+            value={(route[route.length - 1]?.altitude || 0).toFixed(0)} 
+            unit="m" 
+            icon={<Mountain className="w-3.5 h-3.5" />} 
           />
           <StatCard 
-            label="Max Speed" 
-            value={formatSpeed(stats.maxSpeed)} 
-            unit="km/h" 
+            label="Ascent" 
+            value={stats.elevationGain.toFixed(0)} 
+            unit="m" 
             icon={<TrendingUp className="w-3.5 h-3.5" />} 
           />
           <StatCard 
-            label="Elevation" 
-            value={stats.elevationGain.toFixed(0)} 
+            label="Descent" 
+            value={stats.elevationLoss.toFixed(0)} 
             unit="m" 
             icon={<Activity className="w-3.5 h-3.5" />} 
           />
