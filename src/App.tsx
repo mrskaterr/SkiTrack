@@ -47,11 +47,13 @@ const calculateDistance = (p1: { lat: number, lng: number }, p2: { lat: number, 
   return R * c;
 };
 
-function MapUpdater({ center }: { center: [number, number] }) {
+function MapUpdater({ center, follow }: { center: [number, number], follow: boolean }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
+    if (follow) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map, follow]);
   return null;
 }
 
@@ -59,6 +61,9 @@ export default function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [route, setRoute] = useState<GeoPoint[]>([]);
   const [currentPos, setCurrentPos] = useState<[number, number] | null>(null);
+  const [isLocating, setIsLocating] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [followUser, setFollowUser] = useState(true);
   const [stats, setStats] = useState<SessionStats>({
     distance: 0,
     maxSpeed: 0,
@@ -71,6 +76,22 @@ export default function App() {
   
   const watchId = useRef<number | null>(null);
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
+  const statsRef = useRef<SessionStats>(stats);
+  const routeRef = useRef<GeoPoint[]>([]);
+  const startTimeRef = useRef<number | null>(null);
+
+  // Sync refs with state for tracking logic
+  useEffect(() => {
+    statsRef.current = stats;
+  }, [stats]);
+
+  useEffect(() => {
+    routeRef.current = route;
+  }, [route]);
+
+  useEffect(() => {
+    startTimeRef.current = startTime;
+  }, [startTime]);
 
   // Start/Stop Tracking
   const toggleTracking = useCallback(() => {
@@ -87,15 +108,21 @@ export default function App() {
     } else {
       // Start
       setIsTracking(true);
-      setStartTime(Date.now());
+      const now = Date.now();
+      setStartTime(now);
+      startTimeRef.current = now;
       setRoute([]);
-      setStats({
+      routeRef.current = [];
+      setElapsedTime(0);
+      const initialStats = {
         distance: 0,
         maxSpeed: 0,
         avgSpeed: 0,
         totalTime: 0,
         elevationGain: 0
-      });
+      };
+      setStats(initialStats);
+      statsRef.current = initialStats;
       
       timerInterval.current = setInterval(() => {
         setElapsedTime(prev => prev + 1000);
@@ -114,43 +141,71 @@ export default function App() {
 
           setCurrentPos([latitude, longitude]);
           
-          setRoute(prev => {
-            const lastPoint = prev[prev.length - 1];
-            if (lastPoint) {
-              const d = calculateDistance(lastPoint, newPoint);
-              // Only add if moved more than 2 meters to avoid jitter
-              if (d > 2) {
-                const newDistance = stats.distance + d;
-                const newMaxSpeed = Math.max(stats.maxSpeed, speed || 0);
-                const elevationDiff = altitude && lastPoint.altitude ? Math.max(0, altitude - lastPoint.altitude) : 0;
-                
-                setStats(s => ({
-                  ...s,
-                  distance: newDistance,
-                  maxSpeed: newMaxSpeed,
-                  elevationGain: s.elevationGain + elevationDiff,
-                  avgSpeed: newDistance / ((Date.now() - (startTime || Date.now())) / 1000)
-                }));
-                return [...prev, newPoint];
-              }
-              return prev;
+          const lastPoint = routeRef.current[routeRef.current.length - 1];
+          if (lastPoint) {
+            const d = calculateDistance(lastPoint, newPoint);
+            // Only add if moved more than 2 meters to avoid jitter
+            if (d > 2) {
+              const currentStats = statsRef.current;
+              const newDistance = currentStats.distance + d;
+              const newMaxSpeed = Math.max(currentStats.maxSpeed, speed || 0);
+              const elevationDiff = altitude && lastPoint.altitude ? Math.max(0, altitude - lastPoint.altitude) : 0;
+              
+              const updatedStats = {
+                ...currentStats,
+                distance: newDistance,
+                maxSpeed: newMaxSpeed,
+                elevationGain: currentStats.elevationGain + elevationDiff,
+                avgSpeed: newDistance / ((Date.now() - (startTimeRef.current || Date.now())) / 1000)
+              };
+
+              setStats(updatedStats);
+              statsRef.current = updatedStats;
+              setRoute(prev => [...prev, newPoint]);
+              routeRef.current = [...routeRef.current, newPoint];
             }
-            return [newPoint];
-          });
+          } else {
+            setRoute([newPoint]);
+            routeRef.current = [newPoint];
+          }
         },
-        (error) => console.error(error),
-        { enableHighAccuracy: true }
+        (error) => console.error("Geolocation error:", error),
+        { 
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
       );
     }
-  }, [isTracking, stats.distance, stats.maxSpeed, startTime]);
+  }, [isTracking]);
 
   // Initial position
-  useEffect(() => {
+  const getInitialLocation = useCallback(() => {
+    setIsLocating(true);
+    setLocationError(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) => setCurrentPos([pos.coords.latitude, pos.coords.longitude]),
-      (err) => console.error(err)
+      (pos) => {
+        setCurrentPos([pos.coords.latitude, pos.coords.longitude]);
+        setIsLocating(false);
+      },
+      (err) => {
+        console.error("Initial location error:", err);
+        setLocationError(err.message || "Could not get location");
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   }, []);
+
+  useEffect(() => {
+    getInitialLocation();
+  }, [getInitialLocation]);
+
+  const centerMap = () => {
+    if (currentPos) {
+      setFollowUser(true);
+    }
+  };
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor((ms / 1000) % 60);
@@ -164,26 +219,59 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen bg-zinc-950 overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-md z-50">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/10 rounded-lg">
-            <Mountain className="w-6 h-6 text-emerald-500" />
+      <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-md z-50">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-emerald-500/10 rounded-lg">
+            <Mountain className="w-5 h-5 text-emerald-500" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">SkiTrack Pro</h1>
-            <p className="text-xs text-zinc-500 font-mono uppercase tracking-wider">Session Active</p>
+            <h1 className="text-base font-bold tracking-tight leading-none">SkiTrack Pro</h1>
+            <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider mt-0.5">
+              {isTracking ? 'Tracking Active' : 'Ready to Start'}
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col items-end">
-            <span className="text-xs text-zinc-500 font-mono uppercase">Duration</span>
-            <span className="text-xl font-mono font-bold text-emerald-400">{formatTime(elapsedTime)}</span>
-          </div>
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">Duration</span>
+          <span className="text-lg font-mono font-bold text-emerald-400 leading-none">{formatTime(elapsedTime)}</span>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 relative">
+        {/* Loading / Error States */}
+        <AnimatePresence>
+          {(isLocating || locationError) && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[60] bg-zinc-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center"
+            >
+              {isLocating ? (
+                <>
+                  <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
+                  <p className="text-zinc-400 font-medium tracking-wide">Acquiring GPS Signal...</p>
+                </>
+              ) : (
+                <>
+                  <div className="p-4 bg-red-500/10 rounded-full mb-4">
+                    <Activity className="w-8 h-8 text-red-500" />
+                  </div>
+                  <h2 className="text-xl font-bold text-zinc-100 mb-2">Location Error</h2>
+                  <p className="text-zinc-400 mb-6 max-w-xs">{locationError}</p>
+                  <button 
+                    onClick={getInitialLocation}
+                    className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-xl font-bold transition-colors"
+                  >
+                    Retry Connection
+                  </button>
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Map Container */}
         <div className="absolute inset-0 z-0">
           {currentPos && (
@@ -192,26 +280,28 @@ export default function App() {
               zoom={15} 
               zoomControl={false}
               className="w-full h-full"
+              // @ts-ignore
+              tap={false}
             >
               <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               />
-              <MapUpdater center={currentPos} />
+              <MapUpdater center={currentPos} follow={followUser} />
               
               {route.length > 1 && (
                 <Polyline 
                   positions={route.map(p => [p.lat, p.lng])} 
                   color="#10b981" 
-                  weight={4}
-                  opacity={0.8}
+                  weight={5}
+                  opacity={0.9}
                 />
               )}
               
               {currentPos && (
                 <CircleMarker 
                   center={currentPos} 
-                  radius={8}
+                  radius={7}
                   pathOptions={{ fillColor: '#10b981', fillOpacity: 1, color: 'white', weight: 2 }}
                 />
               )}
@@ -220,64 +310,71 @@ export default function App() {
         </div>
 
         {/* Stats Overlay - Top */}
-        <div className="absolute top-4 left-4 right-4 grid grid-cols-2 md:grid-cols-4 gap-4 z-10">
+        <div className="absolute top-3 left-3 right-3 grid grid-cols-2 gap-2 z-10">
           <StatCard 
             label="Distance" 
             value={(stats.distance / 1000).toFixed(2)} 
             unit="km" 
-            icon={<Navigation className="w-4 h-4" />} 
+            icon={<Navigation className="w-3.5 h-3.5" />} 
           />
           <StatCard 
-            label="Current Speed" 
+            label="Speed" 
             value={formatSpeed(route[route.length - 1]?.speed || 0)} 
             unit="km/h" 
-            icon={<Zap className="w-4 h-4" />} 
+            icon={<Zap className="w-3.5 h-3.5" />} 
           />
           <StatCard 
             label="Max Speed" 
             value={formatSpeed(stats.maxSpeed)} 
             unit="km/h" 
-            icon={<TrendingUp className="w-4 h-4" />} 
+            icon={<TrendingUp className="w-3.5 h-3.5" />} 
           />
           <StatCard 
-            label="Elevation Gain" 
+            label="Elevation" 
             value={stats.elevationGain.toFixed(0)} 
             unit="m" 
-            icon={<Activity className="w-4 h-4" />} 
+            icon={<Activity className="w-3.5 h-3.5" />} 
           />
         </div>
 
         {/* Controls - Bottom */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10">
+        <div className="absolute bottom-8 left-0 right-0 px-6 flex justify-center items-center gap-4 z-10">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={toggleTracking}
-            className={`flex items-center gap-3 px-8 py-4 rounded-full font-bold text-lg shadow-2xl transition-colors ${
+            className={`flex-1 max-w-[240px] flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-lg shadow-2xl transition-colors ${
               isTracking 
-                ? 'bg-red-500 hover:bg-red-600 text-white' 
-                : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                ? 'bg-red-500 text-white' 
+                : 'bg-emerald-500 text-white'
             }`}
           >
             {isTracking ? (
               <>
-                <Square className="w-6 h-6 fill-current" />
-                Stop Tracking
+                <Square className="w-5 h-5 fill-current" />
+                Stop
               </>
             ) : (
               <>
-                <Play className="w-6 h-6 fill-current" />
-                Start Tracking
+                <Play className="w-5 h-5 fill-current" />
+                Start
               </>
             )}
           </motion.button>
         </div>
 
         {/* Side Controls */}
-        <div className="absolute right-4 bottom-24 flex flex-col gap-2 z-10">
-          <IconButton icon={<MapIcon className="w-5 h-5" />} />
+        <div className="absolute right-3 bottom-28 flex flex-col gap-2 z-10">
+          <IconButton 
+            active={followUser}
+            onClick={() => setFollowUser(!followUser)}
+            icon={<Navigation className={`w-5 h-5 ${followUser ? 'text-emerald-500' : 'text-zinc-400'}`} />} 
+          />
+          <IconButton 
+            onClick={centerMap}
+            icon={<MapIcon className="w-5 h-5" />} 
+          />
           <IconButton icon={<History className="w-5 h-5" />} />
-          <IconButton icon={<Settings className="w-5 h-5" />} />
         </div>
       </main>
 
@@ -300,25 +397,32 @@ export default function App() {
 function StatCard({ label, value, unit, icon }: { label: string, value: string, unit: string, icon: React.ReactNode }) {
   return (
     <motion.div 
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 p-4 rounded-2xl shadow-lg"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 p-3 rounded-xl shadow-lg"
     >
-      <div className="flex items-center gap-2 text-zinc-500 mb-1">
+      <div className="flex items-center gap-1.5 text-zinc-500 mb-0.5">
         {icon}
-        <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+        <span className="text-[9px] font-bold uppercase tracking-wider truncate">{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-2xl font-mono font-bold text-zinc-100">{value}</span>
-        <span className="text-xs text-zinc-500 font-medium">{unit}</span>
+        <span className="text-xl font-mono font-bold text-zinc-100">{value}</span>
+        <span className="text-[10px] text-zinc-500 font-medium">{unit}</span>
       </div>
     </motion.div>
   );
 }
 
-function IconButton({ icon }: { icon: React.ReactNode }) {
+function IconButton({ icon, onClick, active }: { icon: React.ReactNode, onClick?: () => void, active?: boolean }) {
   return (
-    <button className="p-3 bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-xl text-zinc-400 hover:text-emerald-500 hover:border-emerald-500/50 transition-all shadow-lg">
+    <button 
+      onClick={onClick}
+      className={`p-3 backdrop-blur-xl border rounded-xl transition-all shadow-lg ${
+        active 
+          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-500' 
+          : 'bg-zinc-900/90 border-zinc-800 text-zinc-400 hover:text-emerald-500'
+      }`}
+    >
       {icon}
     </button>
   );
