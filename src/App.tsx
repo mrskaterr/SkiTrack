@@ -63,9 +63,10 @@ export default function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [route, setRoute] = useState<GeoPoint[]>([]);
   const [currentPos, setCurrentPos] = useState<[number, number] | null>(null);
-  const [isLocating, setIsLocating] = useState(true);
+  const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<PermissionState | 'unknown'>('unknown');
+  const [hasStarted, setHasStarted] = useState(false);
   const [followUser, setFollowUser] = useState(true);
   const [stats, setStats] = useState<SessionStats>({
     distance: 0,
@@ -186,8 +187,14 @@ export default function App() {
 
   // Initial position
   const getInitialLocation = useCallback(async () => {
+    if (!navigator.geolocation) {
+      setLocationError("Twoje urządzenie nie obsługuje geolokalizacji.");
+      return;
+    }
+
     setIsLocating(true);
     setLocationError(null);
+    setHasStarted(true);
 
     // Check permission status if API is available
     if ('permissions' in navigator) {
@@ -200,6 +207,12 @@ export default function App() {
       }
     }
 
+    const options: PositionOptions = {
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 0
+    };
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCurrentPos([pos.coords.latitude, pos.coords.longitude]);
@@ -208,25 +221,31 @@ export default function App() {
       },
       (err) => {
         console.error("Initial location error:", err);
-        let msg = "Could not get location";
+        let msg = "Błąd lokalizacji.";
         if (err.code === 1) {
-          msg = "Location permission denied. Please enable it in your browser settings.";
+          msg = "Brak uprawnień do lokalizacji. Upewnij się, że w ustawieniach telefonu aplikacja ma dostęp do GPS.";
           setPermissionStatus('denied');
         } else if (err.code === 2) {
-          msg = "Location unavailable. Check your GPS signal.";
+          msg = "Sygnał GPS jest zbyt słaby. Wyjdź na zewnątrz.";
         } else if (err.code === 3) {
-          msg = "Location request timed out.";
+          msg = "Przekroczono czas oczekiwania na sygnał GPS.";
         }
         setLocationError(msg);
         setIsLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 15000 }
+      options
     );
   }, []);
 
+  // No auto-start to avoid browser blocking
   useEffect(() => {
-    getInitialLocation();
-  }, [getInitialLocation]);
+    // Just check permission status without requesting
+    if ('permissions' in navigator) {
+      navigator.permissions.query({ name: 'geolocation' })
+        .then(status => setPermissionStatus(status.state))
+        .catch(() => {});
+    }
+  }, []);
 
   const centerMap = () => {
     if (currentPos) {
@@ -278,22 +297,36 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 relative">
-        {/* Loading / Error States */}
+        {/* Loading / Error / Start States */}
         <AnimatePresence>
-          {(isLocating || locationError) && (
+          {(!hasStarted || isLocating || locationError) && (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 z-[60] bg-zinc-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center"
+              className="absolute inset-0 z-[60] bg-zinc-950 flex flex-col items-center justify-center p-8 text-center"
             >
-              {isLocating ? (
+              {!hasStarted ? (
+                <>
+                  <div className="p-6 bg-emerald-500/10 rounded-full mb-6">
+                    <Navigation className="w-12 h-12 text-emerald-500" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-zinc-100 mb-3">Wymagana Lokalizacja</h2>
+                  <p className="text-zinc-400 mb-8 max-w-xs">
+                    Aby śledzić Twoją trasę na nartach, aplikacja potrzebuje dostępu do GPS.
+                  </p>
+                  <button 
+                    onClick={getInitialLocation}
+                    className="w-full max-w-xs py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-emerald-500/20"
+                  >
+                    Udostępnij Lokalizację
+                  </button>
+                </>
+              ) : isLocating ? (
                 <>
                   <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
-                  <p className="text-zinc-400 font-medium tracking-wide">Acquiring GPS Signal...</p>
-                  {permissionStatus === 'prompt' && (
-                    <p className="text-zinc-500 text-sm mt-2">Please accept the location prompt</p>
-                  )}
+                  <p className="text-zinc-400 font-medium tracking-wide">Szukanie sygnału GPS...</p>
+                  <p className="text-zinc-500 text-sm mt-2">Upewnij się, że jesteś na zewnątrz</p>
                 </>
               ) : (
                 <>
@@ -301,20 +334,18 @@ export default function App() {
                     <Activity className="w-8 h-8 text-red-500" />
                   </div>
                   <h2 className="text-xl font-bold text-zinc-100 mb-2">
-                    {permissionStatus === 'denied' ? 'Permission Required' : 'Location Error'}
+                    {permissionStatus === 'denied' ? 'Brak Uprawnień' : 'Błąd GPS'}
                   </h2>
                   <p className="text-zinc-400 mb-6 max-w-xs">{locationError}</p>
                   <button 
                     onClick={getInitialLocation}
                     className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-all shadow-xl shadow-emerald-500/20"
                   >
-                    {permissionStatus === 'denied' ? 'Try Again' : 'Retry Connection'}
+                    Spróbuj Ponownie
                   </button>
-                  {permissionStatus === 'denied' && (
-                    <p className="text-zinc-500 text-xs mt-4 max-w-[200px]">
-                      You may need to reset site permissions in your browser's address bar.
-                    </p>
-                  )}
+                  <p className="text-zinc-500 text-xs mt-6 max-w-[240px]">
+                    Jeśli używasz aplikacji APK, upewnij się, że przy jej tworzeniu zaznaczono uprawnienia GPS (ACCESS_FINE_LOCATION).
+                  </p>
                 </>
               )}
             </motion.div>
