@@ -53,10 +53,15 @@ function MapUpdater({ center, follow }: { center: [number, number], follow: bool
   const map = useMap();
   
   useEffect(() => {
-    // Fix for partial map loading
-    setTimeout(() => {
+    // Fix for partial map loading - multiple attempts to ensure size is correct
+    const timer = setInterval(() => {
       map.invalidateSize();
-    }, 250);
+    }, 1000);
+    
+    // Also run immediately
+    map.invalidateSize();
+
+    return () => clearInterval(timer);
   }, [map]);
 
   useEffect(() => {
@@ -387,8 +392,12 @@ export default function App() {
               zoom={15} 
               zoomControl={false}
               className="w-full h-full"
-              // @ts-ignore
-              tap={false}
+              dragging={true}
+              touchZoom={true}
+              doubleClickZoom={true}
+              scrollWheelZoom={true}
+              boxZoom={true}
+              keyboard={true}
             >
               <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
