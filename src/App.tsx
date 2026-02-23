@@ -16,11 +16,13 @@ import {
   Settings,
   Mountain,
   Timer,
-  Activity
+  Activity,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import L from 'leaflet';
 import { GeoPoint, SessionStats } from './types';
+import { generateAppIcon } from './services/iconService';
 
 // Fix Leaflet marker icons
 // @ts-ignore
@@ -63,6 +65,7 @@ export default function App() {
   const [currentPos, setCurrentPos] = useState<[number, number] | null>(null);
   const [isLocating, setIsLocating] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<PermissionState | 'unknown'>('unknown');
   const [followUser, setFollowUser] = useState(true);
   const [stats, setStats] = useState<SessionStats>({
     distance: 0,
@@ -73,6 +76,8 @@ export default function App() {
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [appIcon, setAppIcon] = useState<string | null>(null);
+  const [isGeneratingIcon, setIsGeneratingIcon] = useState(false);
   
   const watchId = useRef<number | null>(null);
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
@@ -180,17 +185,39 @@ export default function App() {
   }, [isTracking]);
 
   // Initial position
-  const getInitialLocation = useCallback(() => {
+  const getInitialLocation = useCallback(async () => {
     setIsLocating(true);
     setLocationError(null);
+
+    // Check permission status if API is available
+    if ('permissions' in navigator) {
+      try {
+        const status = await navigator.permissions.query({ name: 'geolocation' });
+        setPermissionStatus(status.state);
+        status.onchange = () => setPermissionStatus(status.state);
+      } catch (e) {
+        console.warn("Permissions API not supported for geolocation");
+      }
+    }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCurrentPos([pos.coords.latitude, pos.coords.longitude]);
         setIsLocating(false);
+        setPermissionStatus('granted');
       },
       (err) => {
         console.error("Initial location error:", err);
-        setLocationError(err.message || "Could not get location");
+        let msg = "Could not get location";
+        if (err.code === 1) {
+          msg = "Location permission denied. Please enable it in your browser settings.";
+          setPermissionStatus('denied');
+        } else if (err.code === 2) {
+          msg = "Location unavailable. Check your GPS signal.";
+        } else if (err.code === 3) {
+          msg = "Location request timed out.";
+        }
+        setLocationError(msg);
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 15000 }
@@ -215,6 +242,18 @@ export default function App() {
   };
 
   const formatSpeed = (ms: number) => (ms * 3.6).toFixed(1); // m/s to km/h
+
+  const handleGenerateIcon = async () => {
+    setIsGeneratingIcon(true);
+    try {
+      const icon = await generateAppIcon();
+      setAppIcon(icon);
+    } catch (error) {
+      console.error("Failed to generate icon:", error);
+    } finally {
+      setIsGeneratingIcon(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 overflow-hidden">
@@ -252,20 +291,30 @@ export default function App() {
                 <>
                   <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
                   <p className="text-zinc-400 font-medium tracking-wide">Acquiring GPS Signal...</p>
+                  {permissionStatus === 'prompt' && (
+                    <p className="text-zinc-500 text-sm mt-2">Please accept the location prompt</p>
+                  )}
                 </>
               ) : (
                 <>
                   <div className="p-4 bg-red-500/10 rounded-full mb-4">
                     <Activity className="w-8 h-8 text-red-500" />
                   </div>
-                  <h2 className="text-xl font-bold text-zinc-100 mb-2">Location Error</h2>
+                  <h2 className="text-xl font-bold text-zinc-100 mb-2">
+                    {permissionStatus === 'denied' ? 'Permission Required' : 'Location Error'}
+                  </h2>
                   <p className="text-zinc-400 mb-6 max-w-xs">{locationError}</p>
                   <button 
                     onClick={getInitialLocation}
-                    className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-xl font-bold transition-colors"
+                    className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-all shadow-xl shadow-emerald-500/20"
                   >
-                    Retry Connection
+                    {permissionStatus === 'denied' ? 'Try Again' : 'Retry Connection'}
                   </button>
+                  {permissionStatus === 'denied' && (
+                    <p className="text-zinc-500 text-xs mt-4 max-w-[200px]">
+                      You may need to reset site permissions in your browser's address bar.
+                    </p>
+                  )}
                 </>
               )}
             </motion.div>
@@ -374,8 +423,51 @@ export default function App() {
             onClick={centerMap}
             icon={<MapIcon className="w-5 h-5" />} 
           />
+          <IconButton 
+            onClick={handleGenerateIcon}
+            active={!!appIcon}
+            icon={isGeneratingIcon ? <div className="w-5 h-5 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" /> : <Sparkles className="w-5 h-5" />} 
+          />
           <IconButton icon={<History className="w-5 h-5" />} />
         </div>
+
+        {/* App Icon Preview Modal */}
+        <AnimatePresence>
+          {appIcon && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[70] bg-zinc-950/90 backdrop-blur-md flex flex-col items-center justify-center p-8"
+            >
+              <div className="relative group">
+                <img 
+                  src={appIcon} 
+                  alt="App Icon" 
+                  className="w-64 h-64 rounded-[4rem] shadow-2xl border-4 border-zinc-800"
+                />
+                <div className="absolute -inset-4 bg-emerald-500/20 blur-3xl -z-10 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <h2 className="text-2xl font-bold text-zinc-100 mt-8 mb-2">SkiTrack Pro Icon</h2>
+              <p className="text-zinc-400 text-center mb-8 max-w-xs">Twoja nowa ikona aplikacji została wygenerowana przez AI.</p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setAppIcon(null)}
+                  className="px-8 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-xl font-bold transition-colors"
+                >
+                  Zamknij
+                </button>
+                <a 
+                  href={appIcon} 
+                  download="skitrack-icon.png"
+                  className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-colors"
+                >
+                  Pobierz
+                </a>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* Footer / Status Bar */}
