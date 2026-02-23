@@ -28,9 +28,9 @@ import { generateAppIcon } from './services/iconService';
 // @ts-ignore
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
 // Helper to calculate distance between two points (Haversine formula)
@@ -53,15 +53,11 @@ function MapUpdater({ center, follow }: { center: [number, number], follow: bool
   const map = useMap();
   
   useEffect(() => {
-    // Fix for partial map loading - multiple attempts to ensure size is correct
-    const timer = setInterval(() => {
+    // Fix for partial map loading - run once when map is ready
+    const timer = setTimeout(() => {
       map.invalidateSize();
     }, 500);
-    
-    // Also run immediately
-    map.invalidateSize();
-
-    return () => clearInterval(timer);
+    return () => clearTimeout(timer);
   }, [map]);
 
   useEffect(() => {
@@ -392,12 +388,6 @@ export default function App() {
               zoom={15} 
               zoomControl={false}
               className="w-full h-full"
-              dragging={true}
-              touchZoom={true}
-              doubleClickZoom={true}
-              scrollWheelZoom={true}
-              boxZoom={true}
-              keyboard={true}
               preferCanvas={true}
             >
               <TileLayer
