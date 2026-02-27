@@ -18,3 +18,5 @@ View your app in AI Studio: https://ai.studio/apps/a5369842-034b-4a07-9548-95b70
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+#Deployment URL: https://skitrack-production.up.railway.app
