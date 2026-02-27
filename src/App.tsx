@@ -312,11 +312,14 @@ export default function App() {
   const [roomFeedback, setRoomFeedback] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [roomTab, setRoomTab] = useState<'join' | 'create'>('join');
   const [isMicActive, setIsMicActive] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   
   const socketRef = useRef<Socket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const audioQueueRef = useRef<Blob[]>([]);
   const isPlayingAudioRef = useRef(false);
   const t = translations[language];
@@ -537,6 +540,7 @@ export default function App() {
     });
 
     socketRef.current.on('audio-stream', async ({ audio }: { audio: ArrayBuffer }) => {
+      console.log("Received audio chunk, size:", audio.byteLength);
       const blob = new Blob([audio], { type: 'audio/webm; codecs=opus' });
       audioQueueRef.current.push(blob);
       playNextAudio();
@@ -631,7 +635,36 @@ export default function App() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
       
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
+      // Setup Analyser for voice activity visualization
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const checkVolume = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+        setIsSpeaking(average > 30); // Threshold for speaking
+        animationFrameRef.current = requestAnimationFrame(checkVolume);
+      };
+      checkVolume();
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm; codecs=opus') 
+        ? 'audio/webm; codecs=opus' 
+        : 'audio/webm';
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = async (event) => {
@@ -645,22 +678,31 @@ export default function App() {
       };
 
       // Send small chunks for lower latency
-      mediaRecorder.start(200);
+      mediaRecorder.start(250);
       setIsMicActive(true);
+      console.log("Started recording with mimeType:", mimeType);
     } catch (err) {
       console.error("Microphone access error:", err);
-      alert("Could not access microphone.");
+      alert("Błąd dostępu do mikrofonu. Upewnij się, że udzieliłeś uprawnień w przeglądarce.");
     }
   };
 
   const stopRecording = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
     }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
     setIsMicActive(false);
+    setIsSpeaking(false);
+    console.log("Stopped recording");
   };
 
   const toggleMic = () => {
@@ -897,6 +939,7 @@ export default function App() {
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                       <span className="text-xs font-bold text-emerald-400 truncate">{userName} (Ty)</span>
+                      {isSpeaking && <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce" />}
                     </div>
                     <button onClick={toggleMic} className="p-1 hover:bg-emerald-500/20 rounded-md transition-colors">
                       {isMicActive ? <Mic className="w-3.5 h-3.5 text-emerald-500" /> : <MicOff className="w-3.5 h-3.5 text-zinc-500" />}
@@ -958,7 +1001,14 @@ export default function App() {
             <IconButton 
               onClick={toggleMic}
               active={isMicActive}
-              icon={isMicActive ? <Mic className="w-5 h-5 text-emerald-500" /> : <MicOff className="w-5 h-5 text-zinc-400" />} 
+              icon={
+                <div className="relative">
+                  {isMicActive ? <Mic className="w-5 h-5 text-emerald-500" /> : <MicOff className="w-5 h-5 text-zinc-400" />}
+                  {isSpeaking && (
+                    <div className="absolute -inset-1 border-2 border-emerald-500 rounded-full animate-ping opacity-50" />
+                  )}
+                </div>
+              } 
             />
           )}
           <IconButton 
