@@ -478,7 +478,7 @@ export default function App() {
 
     socketRef.current.on('joined-room', ({ roomName }) => {
       setJoinedRoom(roomName);
-      setShowRoomModal(false);
+      // Keep modal open to show the user list as requested
     });
 
     socketRef.current.on('error', (msg: string) => {
@@ -711,6 +711,56 @@ export default function App() {
             icon={<TrendingUp className="w-3.5 h-3.5" />} 
           />
         </div>
+
+        {/* Room Users List Overlay - Persistent when joined */}
+        <AnimatePresence>
+          {joinedRoom && !showRoomModal && (
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="absolute top-44 left-3 z-10 w-48"
+            >
+              <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-3 shadow-2xl">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t.room}</span>
+                  </div>
+                  <div className="px-1.5 py-0.5 bg-emerald-500/10 rounded text-[9px] font-bold text-emerald-500 uppercase">
+                    {joinedRoom}
+                  </div>
+                </div>
+                
+                <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                  {/* Self */}
+                  <div className="flex items-center gap-2 p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                    <span className="text-xs font-bold text-emerald-400 truncate">{userName} (Ty)</span>
+                  </div>
+                  
+                  {/* Others */}
+                  {Array.from(otherUsers.entries()).map(([id, user]) => {
+                    const userData = user as { name: string, lat: number, lng: number };
+                    return (
+                      <div key={id} className="flex items-center gap-2 p-2 bg-zinc-800/50 rounded-lg border border-zinc-800">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="text-xs font-medium text-zinc-300 truncate">{userData.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button 
+                  onClick={leaveRoom}
+                  className="w-full mt-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-wider rounded-xl border border-red-500/20 transition-colors"
+                >
+                  {t.leave}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Controls - Bottom */}
         <div className="absolute bottom-8 left-0 right-0 px-6 flex justify-center items-center gap-4 z-10">
