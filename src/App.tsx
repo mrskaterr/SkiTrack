@@ -20,7 +20,9 @@ import {
   Sparkles,
   Globe,
   X,
-  Users
+  Users,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
@@ -72,7 +74,10 @@ const translations = {
     createRoom: 'Create Room',
     roomAlreadyExists: 'Room already exists',
     roomDoesNotExist: 'Room does not exist',
-    internalError: 'Internal server error'
+    internalError: 'Internal server error',
+    voiceChat: 'Voice Chat',
+    micOn: 'Microphone On',
+    micOff: 'Microphone Off'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -119,7 +124,10 @@ const translations = {
     createRoom: 'Raum erstellen',
     roomAlreadyExists: 'Raum existiert bereits',
     roomDoesNotExist: 'Raum existiert nicht',
-    internalError: 'Interner Serverfehler'
+    internalError: 'Interner Serverfehler',
+    voiceChat: 'Sprachchat',
+    micOn: 'Mikrofon An',
+    micOff: 'Mikrofon Aus'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -166,7 +174,10 @@ const translations = {
     createRoom: 'Crear sala',
     roomAlreadyExists: 'La sala ya existe',
     roomDoesNotExist: 'La sala no existe',
-    internalError: 'Error interno del servidor'
+    internalError: 'Error interno del servidor',
+    voiceChat: 'Chat de voz',
+    micOn: 'Micrófono encendido',
+    micOff: 'Micrófono apagado'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -213,7 +224,10 @@ const translations = {
     createRoom: 'Stwórz pokój',
     roomAlreadyExists: 'Pokój o tej nazwie już istnieje',
     roomDoesNotExist: 'Pokój o tej nazwie nie istnieje',
-    internalError: 'Błąd serwera'
+    internalError: 'Błąd serwera',
+    voiceChat: 'Czat głosowy',
+    micOn: 'Mikrofon włączony',
+    micOff: 'Mikrofon wyłączony'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -297,8 +311,14 @@ export default function App() {
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   const [roomFeedback, setRoomFeedback] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [roomTab, setRoomTab] = useState<'join' | 'create'>('join');
+  const [isMicActive, setIsMicActive] = useState(false);
   
   const socketRef = useRef<Socket | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioQueueRef = useRef<Blob[]>([]);
+  const isPlayingAudioRef = useRef(false);
   const t = translations[language];
   
   const watchId = useRef<number | null>(null);
@@ -516,6 +536,12 @@ export default function App() {
       });
     });
 
+    socketRef.current.on('audio-stream', async ({ audio }: { audio: ArrayBuffer }) => {
+      const blob = new Blob([audio], { type: 'audio/webm; codecs=opus' });
+      audioQueueRef.current.push(blob);
+      playNextAudio();
+    });
+
     socketRef.current.on('joined-room', ({ roomName }) => {
       setJoinedRoom(roomName);
       setIsJoiningRoom(false);
@@ -569,6 +595,80 @@ export default function App() {
     socketRef.current?.emit('leave-room');
     setJoinedRoom(null);
     setOtherUsers(new Map());
+    if (isMicActive) stopRecording();
+  };
+
+  const playNextAudio = async () => {
+    if (isPlayingAudioRef.current || audioQueueRef.current.length === 0) return;
+
+    isPlayingAudioRef.current = true;
+    const blob = audioQueueRef.current.shift();
+    if (!blob) {
+      isPlayingAudioRef.current = false;
+      return;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      isPlayingAudioRef.current = false;
+      playNextAudio();
+    };
+
+    try {
+      await audio.play();
+    } catch (err) {
+      console.error("Audio playback error:", err);
+      isPlayingAudioRef.current = false;
+      playNextAudio();
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0 && socketRef.current && joinedRoom) {
+          const buffer = await event.data.arrayBuffer();
+          socketRef.current.emit('audio-data', {
+            roomName: joinedRoom,
+            audio: buffer
+          });
+        }
+      };
+
+      // Send small chunks for lower latency
+      mediaRecorder.start(200);
+      setIsMicActive(true);
+    } catch (err) {
+      console.error("Microphone access error:", err);
+      alert("Could not access microphone.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    setIsMicActive(false);
+  };
+
+  const toggleMic = () => {
+    if (isMicActive) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const centerMap = () => {
@@ -793,9 +893,14 @@ export default function App() {
                 
                 <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                   {/* Self */}
-                  <div className="flex items-center gap-2 p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                    <span className="text-xs font-bold text-emerald-400 truncate">{userName} (Ty)</span>
+                  <div className="flex items-center justify-between p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                      <span className="text-xs font-bold text-emerald-400 truncate">{userName} (Ty)</span>
+                    </div>
+                    <button onClick={toggleMic} className="p-1 hover:bg-emerald-500/20 rounded-md transition-colors">
+                      {isMicActive ? <Mic className="w-3.5 h-3.5 text-emerald-500" /> : <MicOff className="w-3.5 h-3.5 text-zinc-500" />}
+                    </button>
                   </div>
                   
                   {/* Others */}
@@ -849,6 +954,13 @@ export default function App() {
 
         {/* Side Controls */}
         <div className="absolute right-3 bottom-28 flex flex-col gap-2 z-10">
+          {joinedRoom && (
+            <IconButton 
+              onClick={toggleMic}
+              active={isMicActive}
+              icon={isMicActive ? <Mic className="w-5 h-5 text-emerald-500" /> : <MicOff className="w-5 h-5 text-zinc-400" />} 
+            />
+          )}
           <IconButton 
             onClick={() => setShowRoomModal(true)}
             active={!!joinedRoom}
@@ -952,6 +1064,26 @@ export default function App() {
                     <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
                       <p className="text-zinc-400 text-sm mb-1">{t.connectedToRoom}</p>
                       <p className="text-xl font-bold text-emerald-500">{joinedRoom}</p>
+                    </div>
+
+                    <div className="p-4 bg-zinc-800/50 border border-zinc-800 rounded-2xl">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{t.voiceChat}</h3>
+                        <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tighter ${isMicActive ? 'bg-emerald-500 text-white animate-pulse' : 'bg-zinc-700 text-zinc-400'}`}>
+                          {isMicActive ? 'Live' : 'Off'}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={toggleMic}
+                        className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+                          isMicActive 
+                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                            : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
+                        }`}
+                      >
+                        {isMicActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                        {isMicActive ? t.micOn : t.micOff}
+                      </button>
                     </div>
                     
                     <div>

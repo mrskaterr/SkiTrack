@@ -1,5 +1,5 @@
 {
   "name": "SkiTrack Pro",
   "description": "Real-time ski route tracker with speed, distance, and altitude monitoring.",
-  "requestFramePermissions": ["geolocation"]
+  "requestFramePermissions": ["geolocation", "microphone"]
 }
