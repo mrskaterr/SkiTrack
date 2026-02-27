@@ -25,34 +25,51 @@ async function startServer() {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("join-room", ({ roomName, password, userName }) => {
-      let room = rooms.get(roomName);
+    socket.on("join-room", ({ roomName, password, userName, isCreating }) => {
+      try {
+        if (!roomName || !password || !userName) {
+          socket.emit("error", "Missing required fields");
+          return;
+        }
 
-      if (!room) {
-        // Create room if it doesn't exist
-        room = { password, users: new Map() };
-        rooms.set(roomName, room);
+        let room = rooms.get(roomName);
+
+        if (isCreating) {
+          if (room) {
+            socket.emit("error", "Room already exists");
+            return;
+          }
+          room = { password, users: new Map() };
+          rooms.set(roomName, room);
+        } else {
+          if (!room) {
+            socket.emit("error", "Room does not exist");
+            return;
+          }
+          if (room.password !== password) {
+            socket.emit("error", "Invalid password");
+            return;
+          }
+        }
+
+        // Join the socket room
+        socket.join(roomName);
+        
+        // Add user to state
+        room.users.set(socket.id, { name: userName, lat: 0, lng: 0 });
+        
+        socket.emit("joined-room", { roomName });
+        
+        // Notify others in the room
+        const usersList = Array.from(room.users.entries()).map(([id, data]: [string, any]) => ({
+          id,
+          ...data
+        }));
+        io.to(roomName).emit("room-users", usersList);
+      } catch (err) {
+        console.error("Join room error:", err);
+        socket.emit("error", "Internal server error");
       }
-
-      if (room.password !== password) {
-        socket.emit("error", "Invalid password");
-        return;
-      }
-
-      // Join the socket room
-      socket.join(roomName);
-      
-      // Add user to state
-      room.users.set(socket.id, { name: userName, lat: 0, lng: 0 });
-      
-      socket.emit("joined-room", { roomName });
-      
-      // Notify others in the room
-      const usersList = Array.from(room.users.entries()).map(([id, data]: [string, any]) => ({
-        id,
-        ...data
-      }));
-      io.to(roomName).emit("room-users", usersList);
     });
 
     socket.on("update-location", ({ roomName, lat, lng }) => {

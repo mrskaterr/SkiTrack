@@ -68,7 +68,10 @@ const translations = {
     joiningRoom: 'Joining room...',
     roomJoinedSuccess: 'Successfully joined the room!',
     joinRoom: 'Join Room',
-    createRoom: 'Create Room'
+    createRoom: 'Create Room',
+    roomAlreadyExists: 'Room already exists',
+    roomDoesNotExist: 'Room does not exist',
+    internalError: 'Internal server error'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -111,7 +114,10 @@ const translations = {
     joiningRoom: 'Raum beitreten...',
     roomJoinedSuccess: 'Erfolgreich dem Raum beigetreten!',
     joinRoom: 'Raum beitreten',
-    createRoom: 'Raum erstellen'
+    createRoom: 'Raum erstellen',
+    roomAlreadyExists: 'Raum existiert bereits',
+    roomDoesNotExist: 'Raum existiert nicht',
+    internalError: 'Interner Serverfehler'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -154,7 +160,10 @@ const translations = {
     joiningRoom: 'Uniéndose a la sala...',
     roomJoinedSuccess: '¡Te has unido a la sala con éxito!',
     joinRoom: 'Unirse a sala',
-    createRoom: 'Crear sala'
+    createRoom: 'Crear sala',
+    roomAlreadyExists: 'La sala ya existe',
+    roomDoesNotExist: 'La sala no existe',
+    internalError: 'Error interno del servidor'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -197,7 +206,10 @@ const translations = {
     joiningRoom: 'Dołączanie do pokoju...',
     roomJoinedSuccess: 'Pomyślnie dołączono do pokoju!',
     joinRoom: 'Dołącz do pokoju',
-    createRoom: 'Stwórz pokój'
+    createRoom: 'Stwórz pokój',
+    roomAlreadyExists: 'Pokój o tej nazwie już istnieje',
+    roomDoesNotExist: 'Pokój o tej nazwie nie istnieje',
+    internalError: 'Błąd serwera'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -466,6 +478,11 @@ export default function App() {
   useEffect(() => {
     socketRef.current = io();
 
+    socketRef.current.on('connect_error', () => {
+      setIsJoiningRoom(false);
+      setRoomFeedback({ type: 'error', msg: 'Connection error' });
+    });
+
     socketRef.current.on('user-location-update', ({ id, lat, lng }) => {
       setOtherUsers(prev => {
         const next = new Map(prev);
@@ -498,21 +515,27 @@ export default function App() {
     socketRef.current.on('joined-room', ({ roomName }) => {
       setJoinedRoom(roomName);
       setIsJoiningRoom(false);
-      setRoomFeedback({ type: 'success', msg: t.roomJoinedSuccess });
-      // Clear feedback after 3 seconds
+      // Use current translations from ref or state if needed, but here we can just use a generic success
+      setRoomFeedback({ type: 'success', msg: translations[language].roomJoinedSuccess });
       setTimeout(() => setRoomFeedback(null), 3000);
     });
 
     socketRef.current.on('error', (msg: string) => {
       setIsJoiningRoom(false);
-      const errorMsg = msg === 'Invalid password' ? t.invalidPassword : msg;
+      const currentT = translations[language];
+      let errorMsg = msg;
+      if (msg === 'Invalid password') errorMsg = currentT.invalidPassword;
+      else if (msg === 'Room already exists') errorMsg = currentT.roomAlreadyExists;
+      else if (msg === 'Room does not exist') errorMsg = currentT.roomDoesNotExist;
+      else if (msg === 'Internal server error') errorMsg = currentT.internalError;
+      
       setRoomFeedback({ type: 'error', msg: errorMsg });
     });
 
     return () => {
       socketRef.current?.disconnect();
     };
-  }, [t.invalidPassword]);
+  }, [language]); // Re-bind listeners when language changes to use correct translations in feedback
 
   // Update location in room
   useEffect(() => {
@@ -529,7 +552,12 @@ export default function App() {
     if (!roomName || !roomPassword || !userName) return;
     setIsJoiningRoom(true);
     setRoomFeedback(null);
-    socketRef.current?.emit('join-room', { roomName, password: roomPassword, userName });
+    socketRef.current?.emit('join-room', { 
+      roomName, 
+      password: roomPassword, 
+      userName,
+      isCreating: roomTab === 'create'
+    });
   };
 
   const leaveRoom = () => {
