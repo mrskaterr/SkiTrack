@@ -19,6 +19,11 @@ async function startServer() {
 
   const PORT = 3000;
 
+  // Health check
+  app.get("/api/socket-health", (req, res) => {
+    res.json({ status: "ok", rooms: rooms.size });
+  });
+
   // Room state: roomName -> { password, users: { socketId -> { lat, lng, name } } }
   const rooms = new Map<string, any>();
 

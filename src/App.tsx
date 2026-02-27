@@ -67,6 +67,7 @@ const translations = {
     otherUsers: 'Other Users',
     joiningRoom: 'Joining room...',
     roomJoinedSuccess: 'Successfully joined the room!',
+    roomCreatedSuccess: 'Successfully created the room!',
     joinRoom: 'Join Room',
     createRoom: 'Create Room',
     roomAlreadyExists: 'Room already exists',
@@ -113,6 +114,7 @@ const translations = {
     otherUsers: 'Andere Benutzer',
     joiningRoom: 'Raum beitreten...',
     roomJoinedSuccess: 'Erfolgreich dem Raum beigetreten!',
+    roomCreatedSuccess: 'Raum erfolgreich erstellt!',
     joinRoom: 'Raum beitreten',
     createRoom: 'Raum erstellen',
     roomAlreadyExists: 'Raum existiert bereits',
@@ -159,6 +161,7 @@ const translations = {
     otherUsers: 'Otros usuarios',
     joiningRoom: 'Uniéndose a la sala...',
     roomJoinedSuccess: '¡Te has unido a la sala con éxito!',
+    roomCreatedSuccess: '¡Sala creada con éxito!',
     joinRoom: 'Unirse a sala',
     createRoom: 'Crear sala',
     roomAlreadyExists: 'La sala ya existe',
@@ -205,6 +208,7 @@ const translations = {
     otherUsers: 'Inni użytkownicy',
     joiningRoom: 'Dołączanie do pokoju...',
     roomJoinedSuccess: 'Pomyślnie dołączono do pokoju!',
+    roomCreatedSuccess: 'Pomyślnie stworzono pokój!',
     joinRoom: 'Dołącz do pokoju',
     createRoom: 'Stwórz pokój',
     roomAlreadyExists: 'Pokój o tej nazwie już istnieje',
@@ -515,8 +519,9 @@ export default function App() {
     socketRef.current.on('joined-room', ({ roomName }) => {
       setJoinedRoom(roomName);
       setIsJoiningRoom(false);
-      // Use current translations from ref or state if needed, but here we can just use a generic success
-      setRoomFeedback({ type: 'success', msg: translations[language].roomJoinedSuccess });
+      const currentT = translations[language];
+      const successMsg = roomTab === 'create' ? currentT.roomCreatedSuccess : currentT.roomJoinedSuccess;
+      setRoomFeedback({ type: 'success', msg: successMsg });
       setTimeout(() => setRoomFeedback(null), 3000);
     });
 
@@ -1057,7 +1062,7 @@ export default function App() {
                           {t.joiningRoom}
                         </>
                       ) : (
-                        t.join
+                        roomTab === 'create' ? t.createRoom : t.join
                       )}
                     </button>
                   </div>
