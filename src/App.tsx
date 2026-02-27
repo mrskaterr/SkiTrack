@@ -385,25 +385,26 @@ export default function App() {
               preferCanvas={true}
             >
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+                maxZoom={17}
               />
               <MapUpdater center={currentPos} follow={followUser} />
               
               {route.length > 1 && (
                 <Polyline 
                   positions={route.map(p => [p.lat, p.lng])} 
-                  color="#10b981" 
-                  weight={5}
-                  opacity={0.9}
+                  color="#ef4444" 
+                  weight={6}
+                  opacity={1}
                 />
               )}
               
               {currentPos && (
                 <CircleMarker 
                   center={currentPos} 
-                  radius={7}
-                  pathOptions={{ fillColor: '#10b981', fillOpacity: 1, color: 'white', weight: 2 }}
+                  radius={8}
+                  pathOptions={{ fillColor: '#ef4444', fillOpacity: 1, color: 'white', weight: 3 }}
                 />
               )}
             </MapContainer>
