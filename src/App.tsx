@@ -393,6 +393,12 @@ export default function App() {
                 attribution='Labels &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, TomTom, and others'
                 zIndex={1000}
               />
+              <TileLayer
+                url="https://tile.waymarkedtrails.org/slopes/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://slopes.waymarkedtrails.org">Waymarked Trails</a>'
+                zIndex={900}
+                opacity={0.8}
+              />
               <MapUpdater center={currentPos} follow={followUser} />
               
               {route.length > 1 && (
