@@ -10,6 +10,7 @@ import {
   Square, 
   Navigation, 
   TrendingUp, 
+  ArrowDownRight,
   Zap, 
   Settings as SettingsIcon,
   Mountain,
@@ -74,7 +75,8 @@ const translations = {
     internalError: 'Internal server error',
     voiceChat: 'Voice Chat',
     micOn: 'Microphone On',
-    micOff: 'Microphone Off'
+    micOff: 'Microphone Off',
+    slope: 'Slope'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -124,7 +126,8 @@ const translations = {
     internalError: 'Interner Serverfehler',
     voiceChat: 'Sprachchat',
     micOn: 'Mikrofon An',
-    micOff: 'Mikrofon Aus'
+    micOff: 'Mikrofon Aus',
+    slope: 'Gefälle'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -174,7 +177,8 @@ const translations = {
     internalError: 'Error interno del servidor',
     voiceChat: 'Chat de voz',
     micOn: 'Micrófono encendido',
-    micOff: 'Micrófono apagado'
+    micOff: 'Micrófono apagado',
+    slope: 'Pendiente'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -224,7 +228,8 @@ const translations = {
     internalError: 'Błąd serwera',
     voiceChat: 'Czat głosowy',
     micOn: 'Mikrofon włączony',
-    micOff: 'Mikrofon wyłączony'
+    micOff: 'Mikrofon wyłączony',
+    slope: 'Spadek'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -291,7 +296,8 @@ export default function App() {
     avgSpeed: 0,
     totalTime: 0,
     elevationGain: 0,
-    elevationLoss: 0
+    elevationLoss: 0,
+    currentSlope: 0
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -369,7 +375,8 @@ export default function App() {
         avgSpeed: 0,
         totalTime: 0,
         elevationGain: 0,
-        elevationLoss: 0
+        elevationLoss: 0,
+        currentSlope: 0
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -402,11 +409,17 @@ export default function App() {
               
               let elevationGain = currentStats.elevationGain;
               let elevationLoss = currentStats.elevationLoss;
+              let currentSlope = currentStats.currentSlope;
               
               if (altitude !== null && lastPoint.altitude !== null) {
                 const diff = altitude - lastPoint.altitude;
                 if (diff > 0.5) elevationGain += diff; // Filter small noise
                 if (diff < -0.5) elevationLoss += Math.abs(diff);
+                
+                // Calculate slope: (elevation change in cm) / (distance in meters)
+                // We show "spadek" (descent) as positive, so use (last - current)
+                const slopeVal = ((lastPoint.altitude - altitude) * 100) / d;
+                currentSlope = slopeVal;
               }
               
               const updatedStats = {
@@ -415,6 +428,7 @@ export default function App() {
                 maxSpeed: newMaxSpeed,
                 elevationGain,
                 elevationLoss,
+                currentSlope,
                 avgSpeed: newDistance / ((Date.now() - (startTimeRef.current || Date.now())) / 1000)
               };
 
@@ -907,7 +921,7 @@ export default function App() {
         </div>
 
         {/* Stats Overlay - Top */}
-        <div className="absolute top-3 left-3 right-3 grid grid-cols-2 gap-2 z-10">
+        <div className="absolute top-3 left-2 right-2 grid grid-cols-5 gap-1 z-10">
           <StatCard 
             label={t.distance} 
             value={(stats.distance / 1000).toFixed(2)} 
@@ -931,6 +945,12 @@ export default function App() {
             value={formatSpeed(stats.maxSpeed)} 
             unit="km/h" 
             icon={<TrendingUp className="w-3.5 h-3.5" />} 
+          />
+          <StatCard 
+            label={t.slope} 
+            value={stats.currentSlope.toFixed(0)} 
+            unit="cm/m" 
+            icon={<ArrowDownRight className="w-3.5 h-3.5" />} 
           />
         </div>
 
@@ -1272,15 +1292,15 @@ function StatCard({ label, value, unit, icon }: { label: string, value: string, 
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 p-3 rounded-xl shadow-lg"
+      className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 p-1.5 rounded-xl shadow-lg flex flex-col justify-center min-w-0"
     >
-      <div className="flex items-center gap-1.5 text-zinc-500 mb-0.5">
-        {icon}
-        <span className="text-[9px] font-bold uppercase tracking-wider truncate">{label}</span>
+      <div className="flex items-center gap-1 text-zinc-500 mb-0.5 overflow-hidden">
+        <span className="shrink-0">{icon}</span>
+        <span className="text-[8px] font-bold uppercase tracking-tight truncate">{label}</span>
       </div>
-      <div className="flex items-baseline gap-1">
-        <span className="text-xl font-mono font-bold text-zinc-100">{value}</span>
-        <span className="text-[10px] text-zinc-500 font-medium">{unit}</span>
+      <div className="flex items-baseline gap-0.5 overflow-hidden">
+        <span className="text-sm font-mono font-bold text-zinc-100 truncate">{value}</span>
+        <span className="text-[8px] text-zinc-500 font-medium shrink-0">{unit}</span>
       </div>
     </motion.div>
   );
