@@ -64,7 +64,9 @@ const translations = {
     leave: 'Leave Room',
     invalidPassword: 'Invalid password',
     connectedToRoom: 'Connected to room',
-    otherUsers: 'Other Users'
+    otherUsers: 'Other Users',
+    joiningRoom: 'Joining room...',
+    roomJoinedSuccess: 'Successfully joined the room!'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -103,7 +105,9 @@ const translations = {
     leave: 'Raum verlassen',
     invalidPassword: 'Ungültiges Passwort',
     connectedToRoom: 'Mit Raum verbunden',
-    otherUsers: 'Andere Benutzer'
+    otherUsers: 'Andere Benutzer',
+    joiningRoom: 'Raum beitreten...',
+    roomJoinedSuccess: 'Erfolgreich dem Raum beigetreten!'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -142,7 +146,9 @@ const translations = {
     leave: 'Salir de la sala',
     invalidPassword: 'Contraseña incorrecta',
     connectedToRoom: 'Conectado a la sala',
-    otherUsers: 'Otros usuarios'
+    otherUsers: 'Otros usuarios',
+    joiningRoom: 'Uniéndose a la sala...',
+    roomJoinedSuccess: '¡Te has unido a la sala con éxito!'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -181,7 +187,9 @@ const translations = {
     leave: 'Opuść pokój',
     invalidPassword: 'Błędne hasło',
     connectedToRoom: 'Połączono z pokojem',
-    otherUsers: 'Inni użytkownicy'
+    otherUsers: 'Inni użytkownicy',
+    joiningRoom: 'Dołączanie do pokoju...',
+    roomJoinedSuccess: 'Pomyślnie dołączono do pokoju!'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -262,6 +270,8 @@ export default function App() {
   const [userName, setUserName] = useState('');
   const [joinedRoom, setJoinedRoom] = useState<string | null>(null);
   const [otherUsers, setOtherUsers] = useState<Map<string, { name: string, lat: number, lng: number }>>(new Map());
+  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+  const [roomFeedback, setRoomFeedback] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   
   const socketRef = useRef<Socket | null>(null);
   const t = translations[language];
@@ -478,11 +488,16 @@ export default function App() {
 
     socketRef.current.on('joined-room', ({ roomName }) => {
       setJoinedRoom(roomName);
-      // Keep modal open to show the user list as requested
+      setIsJoiningRoom(false);
+      setRoomFeedback({ type: 'success', msg: t.roomJoinedSuccess });
+      // Clear feedback after 3 seconds
+      setTimeout(() => setRoomFeedback(null), 3000);
     });
 
     socketRef.current.on('error', (msg: string) => {
-      alert(msg === 'Invalid password' ? t.invalidPassword : msg);
+      setIsJoiningRoom(false);
+      const errorMsg = msg === 'Invalid password' ? t.invalidPassword : msg;
+      setRoomFeedback({ type: 'error', msg: errorMsg });
     });
 
     return () => {
@@ -503,6 +518,8 @@ export default function App() {
 
   const joinRoom = () => {
     if (!roomName || !roomPassword || !userName) return;
+    setIsJoiningRoom(true);
+    setRoomFeedback(null);
     socketRef.current?.emit('join-room', { roomName, password: roomPassword, userName });
   };
 
@@ -881,6 +898,15 @@ export default function App() {
 
                 {joinedRoom ? (
                   <div className="space-y-6">
+                    {roomFeedback?.type === 'success' && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500 text-xs font-bold text-center"
+                      >
+                        {roomFeedback.msg}
+                      </motion.div>
+                    )}
                     <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
                       <p className="text-zinc-400 text-sm mb-1">{t.connectedToRoom}</p>
                       <p className="text-xl font-bold text-emerald-500">{joinedRoom}</p>
@@ -915,6 +941,16 @@ export default function App() {
                   <div className="space-y-4">
                     <p className="text-zinc-400 text-sm mb-4">{t.createJoinRoom}</p>
                     
+                    {roomFeedback?.type === 'error' && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-xs font-bold text-center"
+                      >
+                        {roomFeedback.msg}
+                      </motion.div>
+                    )}
+
                     <div>
                       <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">{t.userName}</label>
                       <input 
@@ -922,7 +958,8 @@ export default function App() {
                         value={userName}
                         onChange={(e) => setUserName(e.target.value)}
                         placeholder="np. Marek"
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-3 px-4 text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors"
+                        disabled={isJoiningRoom}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-3 px-4 text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors disabled:opacity-50"
                       />
                     </div>
 
@@ -933,7 +970,8 @@ export default function App() {
                         value={roomName}
                         onChange={(e) => setRoomName(e.target.value)}
                         placeholder="Nazwa grupy"
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-3 px-4 text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors"
+                        disabled={isJoiningRoom}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-3 px-4 text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors disabled:opacity-50"
                       />
                     </div>
 
@@ -944,16 +982,24 @@ export default function App() {
                         value={roomPassword}
                         onChange={(e) => setRoomPassword(e.target.value)}
                         placeholder="••••••"
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-3 px-4 text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors"
+                        disabled={isJoiningRoom}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl py-3 px-4 text-zinc-100 focus:outline-none focus:border-emerald-500 transition-colors disabled:opacity-50"
                       />
                     </div>
 
                     <button 
                       onClick={joinRoom}
-                      disabled={!roomName || !roomPassword || !userName}
-                      className="w-full mt-4 py-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-emerald-500 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-emerald-500/20"
+                      disabled={!roomName || !roomPassword || !userName || isJoiningRoom}
+                      className="w-full mt-4 py-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:hover:bg-emerald-500 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2"
                     >
-                      {t.join}
+                      {isJoiningRoom ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                          {t.joiningRoom}
+                        </>
+                      ) : (
+                        t.join
+                      )}
                     </button>
                   </div>
                 )}
