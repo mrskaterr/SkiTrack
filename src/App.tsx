@@ -11,13 +11,10 @@ import {
   Navigation, 
   TrendingUp, 
   Zap, 
-  Map as MapIcon, 
-  History, 
   Settings as SettingsIcon,
   Mountain,
   Timer,
   Activity,
-  Sparkles,
   Globe,
   X,
   Users,
@@ -937,62 +934,6 @@ export default function App() {
           />
         </div>
 
-        {/* Room Users List Overlay - Persistent when joined */}
-        <AnimatePresence>
-          {joinedRoom && !showRoomModal && (
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="absolute top-44 left-3 z-10 w-48"
-            >
-              <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-3 shadow-2xl">
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t.room}</span>
-                  </div>
-                  <div className="px-1.5 py-0.5 bg-emerald-500/10 rounded text-[9px] font-bold text-emerald-500 uppercase">
-                    {joinedRoom}
-                  </div>
-                </div>
-                
-                <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                  {/* Self */}
-                  <div className="flex items-center justify-between p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                      <span className="text-xs font-bold text-emerald-400 truncate">{userName} (Ty)</span>
-                      {isSpeaking && <div className="w-1 h-1 bg-emerald-500 rounded-full animate-bounce" />}
-                    </div>
-                    <button onClick={toggleMic} className="p-1 hover:bg-emerald-500/20 rounded-md transition-colors">
-                      {isMicActive ? <Mic className="w-3.5 h-3.5 text-emerald-500" /> : <MicOff className="w-3.5 h-3.5 text-zinc-500" />}
-                    </button>
-                  </div>
-                  
-                  {/* Others */}
-                  {Array.from(otherUsers.entries()).map(([id, user]) => {
-                    const userData = user as { name: string, lat: number, lng: number };
-                    return (
-                      <div key={id} className="flex items-center gap-2 p-2 bg-zinc-800/50 rounded-lg border border-zinc-800">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                        <span className="text-xs font-medium text-zinc-300 truncate">{userData.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <button 
-                  onClick={leaveRoom}
-                  className="w-full mt-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-wider rounded-xl border border-red-500/20 transition-colors"
-                >
-                  {t.leave}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Controls - Bottom */}
         <div className="absolute bottom-8 left-0 right-0 px-6 flex justify-center items-center gap-4 z-10">
           <motion.button
@@ -1059,55 +1000,9 @@ export default function App() {
             onClick={() => setFollowUser(!followUser)}
             icon={<Navigation className={`w-5 h-5 ${followUser ? 'text-emerald-500' : 'text-zinc-400'}`} />} 
           />
-          <IconButton 
-            onClick={centerMap}
-            icon={<MapIcon className="w-5 h-5" />} 
-          />
-          <IconButton 
-            onClick={handleGenerateIcon}
-            active={!!appIcon}
-            icon={isGeneratingIcon ? <div className="w-5 h-5 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" /> : <Sparkles className="w-5 h-5" />} 
-          />
-          <IconButton icon={<History className="w-5 h-5" />} />
         </div>
 
-        {/* App Icon Preview Modal */}
-        <AnimatePresence>
-          {appIcon && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-[70] bg-zinc-950/90 backdrop-blur-md flex flex-col items-center justify-center p-8"
-            >
-              <div className="relative group">
-                <img 
-                  src={appIcon} 
-                  alt="App Icon" 
-                  className="w-64 h-64 rounded-[4rem] shadow-2xl border-4 border-zinc-800"
-                />
-                <div className="absolute -inset-4 bg-emerald-500/20 blur-3xl -z-10 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-100 mt-8 mb-2">{t.iconTitle}</h2>
-              <p className="text-zinc-400 text-center mb-8 max-w-xs">{t.iconDesc}</p>
-              <div className="flex gap-4">
-                <button 
-                  onClick={() => setAppIcon(null)}
-                  className="px-8 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-xl font-bold transition-colors"
-                >
-                  {t.close}
-                </button>
-                <a 
-                  href={appIcon} 
-                  download="skitrack-icon.png"
-                  className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-colors"
-                >
-                  {t.download}
-                </a>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Controls - Bottom */}
 
         {/* Room Modal */}
         <AnimatePresence>
