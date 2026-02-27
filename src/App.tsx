@@ -311,12 +311,6 @@ export default function App() {
         </div>
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">Speed</span>
-            <span className="text-lg font-mono font-bold text-emerald-400 leading-none">
-              {formatSpeed(route[route.length - 1]?.speed || 0)} <span className="text-[10px]">km/h</span>
-            </span>
-          </div>
-          <div className="flex flex-col items-end">
             <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">Duration</span>
             <span className="text-lg font-mono font-bold text-emerald-400 leading-none">{formatTime(elapsedTime)}</span>
           </div>
@@ -431,16 +425,16 @@ export default function App() {
             icon={<Mountain className="w-3.5 h-3.5" />} 
           />
           <StatCard 
-            label="Ascent" 
-            value={stats.elevationGain.toFixed(0)} 
-            unit="m" 
-            icon={<TrendingUp className="w-3.5 h-3.5" />} 
+            label="Speed" 
+            value={formatSpeed(route[route.length - 1]?.speed || 0)} 
+            unit="km/h" 
+            icon={<Zap className="w-3.5 h-3.5" />} 
           />
           <StatCard 
-            label="Descent" 
-            value={stats.elevationLoss.toFixed(0)} 
-            unit="m" 
-            icon={<Activity className="w-3.5 h-3.5" />} 
+            label="Max Speed" 
+            value={formatSpeed(stats.maxSpeed)} 
+            unit="km/h" 
+            icon={<TrendingUp className="w-3.5 h-3.5" />} 
           />
         </div>
 
