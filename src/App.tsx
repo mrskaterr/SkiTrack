@@ -313,6 +313,7 @@ export default function App() {
   const [roomTab, setRoomTab] = useState<'join' | 'create'>('join');
   const [isMicActive, setIsMicActive] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   
   const socketRef = useRef<Socket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -320,8 +321,9 @@ export default function App() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const audioQueueRef = useRef<Blob[]>([]);
+  const audioQueueRef = useRef<{ blob: Blob, mimeType: string }[]>([]);
   const isPlayingAudioRef = useRef(false);
+  const recorderIntervalRef = useRef<number | null>(null);
   const t = translations[language];
   
   const watchId = useRef<number | null>(null);
@@ -539,10 +541,9 @@ export default function App() {
       });
     });
 
-    socketRef.current.on('audio-stream', async ({ audio }: { audio: ArrayBuffer }) => {
-      console.log("Received audio chunk, size:", audio.byteLength);
-      const blob = new Blob([audio], { type: 'audio/webm; codecs=opus' });
-      audioQueueRef.current.push(blob);
+    socketRef.current.on('audio-stream', async ({ audio, mimeType }: { audio: ArrayBuffer, mimeType: string }) => {
+      const blob = new Blob([audio], { type: mimeType });
+      audioQueueRef.current.push({ blob, mimeType });
       playNextAudio();
     });
 
@@ -606,13 +607,13 @@ export default function App() {
     if (isPlayingAudioRef.current || audioQueueRef.current.length === 0) return;
 
     isPlayingAudioRef.current = true;
-    const blob = audioQueueRef.current.shift();
-    if (!blob) {
+    const item = audioQueueRef.current.shift();
+    if (!item) {
       isPlayingAudioRef.current = false;
       return;
     }
 
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(item.blob);
     const audio = new Audio(url);
     
     audio.onended = () => {
@@ -623,10 +624,16 @@ export default function App() {
 
     try {
       await audio.play();
+      setAudioBlocked(false);
     } catch (err) {
       console.error("Audio playback error:", err);
+      // If blocked by autoplay, show a button
+      if (err instanceof Error && err.name === 'NotAllowedError') {
+        setAudioBlocked(true);
+      }
       isPlayingAudioRef.current = false;
-      playNextAudio();
+      // Don't retry immediately if blocked to avoid infinite loop
+      if (!audioBlocked) playNextAudio();
     }
   };
 
@@ -662,25 +669,39 @@ export default function App() {
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm; codecs=opus') 
         ? 'audio/webm; codecs=opus' 
-        : 'audio/webm';
+        : MediaRecorder.isTypeSupported('audio/ogg; codecs=opus')
+          ? 'audio/ogg; codecs=opus'
+          : 'audio/mp4';
       
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = mediaRecorder;
+      const createRecorder = () => {
+        const mediaRecorder = new MediaRecorder(stream, { mimeType });
+        mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && socketRef.current && joinedRoom) {
-          const buffer = await event.data.arrayBuffer();
-          socketRef.current.emit('audio-data', {
-            roomName: joinedRoom,
-            audio: buffer
-          });
-        }
+        mediaRecorder.ondataavailable = async (event) => {
+          if (event.data.size > 0 && socketRef.current && joinedRoom) {
+            const buffer = await event.data.arrayBuffer();
+            socketRef.current.emit('audio-data', {
+              roomName: joinedRoom,
+              audio: buffer,
+              mimeType
+            });
+          }
+        };
+
+        mediaRecorder.start();
       };
 
-      // Send small chunks for lower latency
-      mediaRecorder.start(250);
+      // Use a cycle of stop/start to create standalone playable chunks
+      createRecorder();
+      recorderIntervalRef.current = window.setInterval(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+          createRecorder();
+        }
+      }, 1000); // 1 second chunks
+
       setIsMicActive(true);
-      console.log("Started recording with mimeType:", mimeType);
+      setAudioBlocked(false); // Interaction happened
     } catch (err) {
       console.error("Microphone access error:", err);
       alert("Błąd dostępu do mikrofonu. Upewnij się, że udzieliłeś uprawnień w przeglądarce.");
@@ -688,6 +709,10 @@ export default function App() {
   };
 
   const stopRecording = () => {
+    if (recorderIntervalRef.current) {
+      clearInterval(recorderIntervalRef.current);
+      recorderIntervalRef.current = null;
+    }
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
@@ -702,7 +727,6 @@ export default function App() {
     }
     setIsMicActive(false);
     setIsSpeaking(false);
-    console.log("Stopped recording");
   };
 
   const toggleMic = () => {
@@ -997,6 +1021,16 @@ export default function App() {
 
         {/* Side Controls */}
         <div className="absolute right-3 bottom-28 flex flex-col gap-2 z-10">
+          {audioBlocked && (
+            <motion.button
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              onClick={() => { setAudioBlocked(false); playNextAudio(); }}
+              className="w-12 h-12 bg-red-500 text-white rounded-2xl flex items-center justify-center shadow-lg animate-bounce"
+            >
+              <Zap className="w-6 h-6" />
+            </motion.button>
+          )}
           {joinedRoom && (
             <IconButton 
               onClick={toggleMic}

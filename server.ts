@@ -93,11 +93,12 @@ async function startServer() {
       }
     });
 
-    socket.on("audio-data", ({ roomName, audio }) => {
+    socket.on("audio-data", ({ roomName, audio, mimeType }) => {
       // Broadcast audio to everyone in the room except the sender
       socket.to(roomName).emit("audio-stream", {
         id: socket.id,
-        audio
+        audio,
+        mimeType
       });
     });
 
