@@ -66,7 +66,9 @@ const translations = {
     connectedToRoom: 'Connected to room',
     otherUsers: 'Other Users',
     joiningRoom: 'Joining room...',
-    roomJoinedSuccess: 'Successfully joined the room!'
+    roomJoinedSuccess: 'Successfully joined the room!',
+    joinRoom: 'Join Room',
+    createRoom: 'Create Room'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -107,7 +109,9 @@ const translations = {
     connectedToRoom: 'Mit Raum verbunden',
     otherUsers: 'Andere Benutzer',
     joiningRoom: 'Raum beitreten...',
-    roomJoinedSuccess: 'Erfolgreich dem Raum beigetreten!'
+    roomJoinedSuccess: 'Erfolgreich dem Raum beigetreten!',
+    joinRoom: 'Raum beitreten',
+    createRoom: 'Raum erstellen'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -148,7 +152,9 @@ const translations = {
     connectedToRoom: 'Conectado a la sala',
     otherUsers: 'Otros usuarios',
     joiningRoom: 'Uniéndose a la sala...',
-    roomJoinedSuccess: '¡Te has unido a la sala con éxito!'
+    roomJoinedSuccess: '¡Te has unido a la sala con éxito!',
+    joinRoom: 'Unirse a sala',
+    createRoom: 'Crear sala'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -189,7 +195,9 @@ const translations = {
     connectedToRoom: 'Połączono z pokojem',
     otherUsers: 'Inni użytkownicy',
     joiningRoom: 'Dołączanie do pokoju...',
-    roomJoinedSuccess: 'Pomyślnie dołączono do pokoju!'
+    roomJoinedSuccess: 'Pomyślnie dołączono do pokoju!',
+    joinRoom: 'Dołącz do pokoju',
+    createRoom: 'Stwórz pokój'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -272,6 +280,7 @@ export default function App() {
   const [otherUsers, setOtherUsers] = useState<Map<string, { name: string, lat: number, lng: number }>>(new Map());
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   const [roomFeedback, setRoomFeedback] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+  const [roomTab, setRoomTab] = useState<'join' | 'create'>('join');
   
   const socketRef = useRef<Socket | null>(null);
   const t = translations[language];
@@ -939,7 +948,29 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <p className="text-zinc-400 text-sm mb-4">{t.createJoinRoom}</p>
+                    {/* Tabs */}
+                    <div className="flex bg-zinc-800 p-1 rounded-2xl mb-6">
+                      <button 
+                        onClick={() => { setRoomTab('join'); setRoomFeedback(null); }}
+                        className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                          roomTab === 'join' ? 'bg-zinc-700 text-white shadow-lg' : 'text-zinc-500'
+                        }`}
+                      >
+                        {t.joinRoom}
+                      </button>
+                      <button 
+                        onClick={() => { setRoomTab('create'); setRoomFeedback(null); }}
+                        className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                          roomTab === 'create' ? 'bg-zinc-700 text-white shadow-lg' : 'text-zinc-500'
+                        }`}
+                      >
+                        {t.createRoom}
+                      </button>
+                    </div>
+
+                    <p className="text-zinc-400 text-sm mb-4">
+                      {roomTab === 'join' ? t.joinRoom : t.createRoom}
+                    </p>
                     
                     {roomFeedback?.type === 'error' && (
                       <motion.div 
