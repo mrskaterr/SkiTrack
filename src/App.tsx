@@ -791,6 +791,15 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end border-r border-zinc-800 pr-4">
+            <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">{t.speed}</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-mono font-bold text-zinc-100 leading-none">
+                {formatSpeed(route[route.length - 1]?.speed || 0)}
+              </span>
+              <span className="text-[9px] text-zinc-500 font-medium">km/h</span>
+            </div>
+          </div>
           <div className="flex flex-col items-end">
             <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">{t.duration}</span>
             <span className="text-lg font-mono font-bold text-emerald-400 leading-none">{formatTime(elapsedTime)}</span>
@@ -921,7 +930,7 @@ export default function App() {
         </div>
 
         {/* Stats Overlay - Top */}
-        <div className="absolute top-3 left-2 right-2 grid grid-cols-5 gap-1 z-10">
+        <div className="absolute top-3 left-2 right-2 grid grid-cols-4 gap-1 z-10">
           <StatCard 
             label={t.distance} 
             value={(stats.distance / 1000).toFixed(2)} 
@@ -933,12 +942,6 @@ export default function App() {
             value={(route[route.length - 1]?.altitude || 0).toFixed(0)} 
             unit="m" 
             icon={<Mountain className="w-3.5 h-3.5" />} 
-          />
-          <StatCard 
-            label={t.speed} 
-            value={formatSpeed(route[route.length - 1]?.speed || 0)} 
-            unit="km/h" 
-            icon={<Zap className="w-3.5 h-3.5" />} 
           />
           <StatCard 
             label={t.maxSpeed} 
