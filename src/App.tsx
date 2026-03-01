@@ -76,7 +76,14 @@ const translations = {
     voiceChat: 'Voice Chat',
     micOn: 'Microphone On',
     micOff: 'Microphone Off',
-    slope: 'Slope'
+    slope: 'Slope',
+    altitudeCalibration: 'Altitude Calibration',
+    altitudeOffset: 'Altitude Offset',
+    calibrationDesc: 'Adjust altitude if GPS shows incorrect data (e.g. above sea level).',
+    autoCalibrate: 'Auto-Calibrate',
+    calibrating: 'Calibrating...',
+    calibrationSuccess: 'Altitude calibrated!',
+    calibrationError: 'Calibration error'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -229,7 +236,14 @@ const translations = {
     voiceChat: 'Czat głosowy',
     micOn: 'Mikrofon włączony',
     micOff: 'Mikrofon wyłączony',
-    slope: 'Spadek'
+    slope: 'Spadek',
+    altitudeCalibration: 'Kalibracja Wysokości',
+    altitudeOffset: 'Offset Wysokości',
+    calibrationDesc: 'Dostosuj wysokość, jeśli GPS pokazuje błędne dane (np. nad poziomem morza).',
+    autoCalibrate: 'Auto-Kalibracja',
+    calibrating: 'Kalibrowanie...',
+    calibrationSuccess: 'Wysokość skalibrowana!',
+    calibrationError: 'Błąd kalibracji'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -305,6 +319,10 @@ export default function App() {
   const [isGeneratingIcon, setIsGeneratingIcon] = useState(false);
   const [language, setLanguage] = useState<Language>('pl');
   const [showSettings, setShowSettings] = useState(false);
+  const [altitudeOffset, setAltitudeOffset] = useState(0);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [calibrationFeedback, setCalibrationFeedback] = useState<string | null>(null);
+  const lastAltitudes = useRef<number[]>([]);
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [roomName, setRoomName] = useState('');
   const [roomPassword, setRoomPassword] = useState('');
@@ -349,6 +367,35 @@ export default function App() {
   }, [startTime]);
 
   // Start/Stop Tracking
+  const handleAutoCalibrate = async () => {
+    if (!currentPos) return;
+    setIsCalibrating(true);
+    setCalibrationFeedback(null);
+    try {
+      const resp = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${currentPos[0]},${currentPos[1]}`);
+      const data = await resp.json();
+      if (data.results && data.results[0]) {
+        const groundElevation = data.results[0].elevation;
+        const gpsAltitude = routeRef.current[routeRef.current.length - 1]?.altitude || 0;
+        if (gpsAltitude !== 0) {
+          const offset = Math.round(groundElevation - gpsAltitude);
+          setAltitudeOffset(offset);
+          setCalibrationFeedback(t.calibrationSuccess);
+        } else {
+          // If no GPS altitude yet, just set offset to ground elevation assuming GPS is at 0
+          setAltitudeOffset(Math.round(groundElevation));
+          setCalibrationFeedback(t.calibrationSuccess);
+        }
+      }
+    } catch (err) {
+      console.error("Calibration error:", err);
+      setCalibrationFeedback(t.calibrationError);
+    } finally {
+      setIsCalibrating(false);
+      setTimeout(() => setCalibrationFeedback(null), 3000);
+    }
+  };
+
   const toggleTracking = useCallback(() => {
     if (isTracking) {
       // Stop
@@ -388,12 +435,21 @@ export default function App() {
       watchId.current = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude, speed, altitude } = position.coords;
+          
+          // Simple smoothing for altitude
+          let smoothedAltitude = altitude || 0;
+          if (altitude !== null) {
+            lastAltitudes.current.push(altitude);
+            if (lastAltitudes.current.length > 5) lastAltitudes.current.shift();
+            smoothedAltitude = lastAltitudes.current.reduce((a, b) => a + b, 0) / lastAltitudes.current.length;
+          }
+
           const newPoint: GeoPoint = {
             lat: latitude,
             lng: longitude,
             timestamp: position.timestamp,
             speed: speed || 0,
-            altitude: altitude || 0
+            altitude: smoothedAltitude
           };
 
           setCurrentPos([latitude, longitude]);
@@ -939,7 +995,7 @@ export default function App() {
           />
           <StatCard 
             label={t.altitude} 
-            value={(route[route.length - 1]?.altitude || 0).toFixed(0)} 
+            value={((route[route.length - 1]?.altitude || 0) + altitudeOffset).toFixed(0)} 
             unit="m" 
             icon={<Mountain className="w-3.5 h-3.5" />} 
           />
@@ -1259,6 +1315,70 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 text-zinc-400 mb-2">
+                      <Mountain className="w-4 h-4" />
+                      <span className="text-sm font-bold uppercase tracking-wider">{t.altitudeCalibration}</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mb-4 leading-relaxed">
+                      {t.calibrationDesc}
+                    </p>
+                    <div className="flex items-center gap-4 bg-zinc-800 p-3 rounded-xl border border-zinc-700">
+                      <button 
+                        onClick={() => setAltitudeOffset(prev => prev - 1)}
+                        className="w-10 h-10 flex items-center justify-center bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white font-bold transition-colors"
+                      >
+                        -1
+                      </button>
+                      <div className="flex-1 text-center">
+                        <span className="text-xl font-mono font-bold text-emerald-400">{altitudeOffset > 0 ? `+${altitudeOffset}` : altitudeOffset} m</span>
+                      </div>
+                      <button 
+                        onClick={() => setAltitudeOffset(prev => prev + 1)}
+                        className="w-10 h-10 flex items-center justify-center bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white font-bold transition-colors"
+                      >
+                        +1
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <button 
+                        onClick={() => setAltitudeOffset(prev => prev - 10)}
+                        className="py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-lg border border-zinc-700 transition-colors"
+                      >
+                        -10m
+                      </button>
+                      <button 
+                        onClick={() => setAltitudeOffset(prev => prev + 10)}
+                        className="py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-lg border border-zinc-700 transition-colors"
+                      >
+                        +10m
+                      </button>
+                    </div>
+                    
+                    <button 
+                      onClick={handleAutoCalibrate}
+                      disabled={isCalibrating || !currentPos}
+                      className="w-full mt-4 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isCalibrating ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+                          {t.calibrating}
+                        </>
+                      ) : (
+                        <>
+                          <Globe className="w-4 h-4" />
+                          {t.autoCalibrate}
+                        </>
+                      )}
+                    </button>
+                    {calibrationFeedback && (
+                      <p className={`text-center text-[10px] mt-2 font-bold ${calibrationFeedback === t.calibrationError ? 'text-red-500' : 'text-emerald-500'}`}>
+                        {calibrationFeedback}
+                      </p>
+                    )}
                   </div>
                 </div>
 
