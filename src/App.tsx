@@ -77,6 +77,7 @@ const translations = {
     micOn: 'Microphone On',
     micOff: 'Microphone Off',
     slope: 'Slope',
+    maxAltitude: 'Max Altitude',
     altitudeCalibration: 'Altitude Calibration',
     altitudeOffset: 'Altitude Offset',
     calibrationDesc: 'Adjust altitude if GPS shows incorrect data (e.g. above sea level).',
@@ -134,7 +135,8 @@ const translations = {
     voiceChat: 'Sprachchat',
     micOn: 'Mikrofon An',
     micOff: 'Mikrofon Aus',
-    slope: 'Gefälle'
+    slope: 'Gefälle',
+    maxAltitude: 'Max. Höhe'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -185,7 +187,8 @@ const translations = {
     voiceChat: 'Chat de voz',
     micOn: 'Micrófono encendido',
     micOff: 'Micrófono apagado',
-    slope: 'Pendiente'
+    slope: 'Pendiente',
+    maxAltitude: 'Alt. Máxima'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -237,6 +240,7 @@ const translations = {
     micOn: 'Mikrofon włączony',
     micOff: 'Mikrofon wyłączony',
     slope: 'Spadek',
+    maxAltitude: 'Wysokość Maks.',
     altitudeCalibration: 'Kalibracja Wysokości',
     altitudeOffset: 'Offset Wysokości',
     calibrationDesc: 'Dostosuj wysokość, jeśli GPS pokazuje błędne dane (np. nad poziomem morza).',
@@ -414,7 +418,8 @@ export default function App() {
         totalTime: 0,
         elevationGain: 0,
         elevationLoss: 0,
-        currentSlope: 0
+        currentSlope: 0,
+        maxAltitude: -Infinity
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -481,6 +486,7 @@ export default function App() {
                 elevationGain,
                 elevationLoss,
                 currentSlope,
+                maxAltitude: Math.max(currentStats.maxAltitude, smoothedAltitude),
                 avgSpeed: newDistance / ((Date.now() - (startTimeRef.current || Date.now())) / 1000)
               };
 
@@ -490,6 +496,12 @@ export default function App() {
               routeRef.current = [...routeRef.current, newPoint];
             }
           } else {
+            const initialPointStats = {
+              ...statsRef.current,
+              maxAltitude: smoothedAltitude
+            };
+            setStats(initialPointStats);
+            statsRef.current = initialPointStats;
             setRoute([newPoint]);
             routeRef.current = [newPoint];
           }
@@ -982,7 +994,7 @@ export default function App() {
         </div>
 
         {/* Stats Overlay - Top */}
-        <div className="absolute top-3 left-2 right-2 grid grid-cols-4 gap-1 z-10">
+        <div className="absolute top-3 left-2 right-2 grid grid-cols-5 gap-1 z-10">
           <StatCard 
             label={t.distance} 
             value={(stats.distance / 1000).toFixed(2)} 
@@ -996,10 +1008,16 @@ export default function App() {
             icon={<Mountain className="w-3.5 h-3.5" />} 
           />
           <StatCard 
+            label={t.maxAltitude} 
+            value={stats.maxAltitude === -Infinity ? "0" : (stats.maxAltitude + altitudeOffset).toFixed(0)} 
+            unit="m" 
+            icon={<TrendingUp className="w-3.5 h-3.5" />} 
+          />
+          <StatCard 
             label={t.maxSpeed} 
             value={formatSpeed(stats.maxSpeed)} 
             unit="km/h" 
-            icon={<TrendingUp className="w-3.5 h-3.5" />} 
+            icon={<Zap className="w-3.5 h-3.5" />} 
           />
           <StatCard 
             label={t.slope} 
