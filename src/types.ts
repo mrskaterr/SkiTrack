@@ -13,5 +13,5 @@ export interface SessionStats {
   totalTime: number; // in ms
   elevationGain: number; // in meters
   elevationLoss: number; // in meters
-  currentSlope: number; // in cm/m
+  currentSlope: number; // in percentage
 }

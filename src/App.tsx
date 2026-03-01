@@ -416,7 +416,7 @@ export default function App() {
                 if (diff > 0.5) elevationGain += diff; // Filter small noise
                 if (diff < -0.5) elevationLoss += Math.abs(diff);
                 
-                // Calculate slope: (elevation change in cm) / (distance in meters)
+                // Calculate slope: (elevation change / distance) * 100
                 // We show "spadek" (descent) as positive, so use (last - current)
                 const slopeVal = ((lastPoint.altitude - altitude) * 100) / d;
                 currentSlope = slopeVal;
@@ -952,7 +952,7 @@ export default function App() {
           <StatCard 
             label={t.slope} 
             value={stats.currentSlope.toFixed(0)} 
-            unit="cm/m" 
+            unit="%" 
             icon={<ArrowDownRight className="w-3.5 h-3.5" />} 
           />
         </div>
