@@ -84,7 +84,10 @@ const translations = {
     autoCalibrate: 'Auto-Calibrate',
     calibrating: 'Calibrating...',
     calibrationSuccess: 'Altitude calibrated!',
-    calibrationError: 'Calibration error'
+    calibrationError: 'Calibration error',
+    inAppBrowserWarning: 'In-app browser detected',
+    inAppBrowserDesc: 'Messenger browser often blocks GPS. For best experience, open this page in Chrome or Safari.',
+    openInBrowser: 'Open in Browser'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -247,7 +250,10 @@ const translations = {
     autoCalibrate: 'Auto-Kalibracja',
     calibrating: 'Kalibrowanie...',
     calibrationSuccess: 'Wysokość skalibrowana!',
-    calibrationError: 'Błąd kalibracji'
+    calibrationError: 'Błąd kalibracji',
+    inAppBrowserWarning: 'Wykryto przeglądarkę Messenger',
+    inAppBrowserDesc: 'Przeglądarka Messenger często blokuje GPS. Dla poprawnego działania otwórz tę stronę w Chrome lub Safari.',
+    openInBrowser: 'Otwórz w przeglądarce'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -324,6 +330,7 @@ export default function App() {
   const [language, setLanguage] = useState<Language>('pl');
   const [showSettings, setShowSettings] = useState(false);
   const [altitudeOffset, setAltitudeOffset] = useState(0);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
   const hasCalibrated = useRef(false);
   const lastAltitudes = useRef<number[]>([]);
   const [showRoomModal, setShowRoomModal] = useState(false);
@@ -355,6 +362,16 @@ export default function App() {
   const statsRef = useRef<SessionStats>(stats);
   const routeRef = useRef<GeoPoint[]>([]);
   const startTimeRef = useRef<number | null>(null);
+
+  // Detect in-app browser
+  useEffect(() => {
+    const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
+    const isMessenger = ua.indexOf('FBAN') > -1 || ua.indexOf('FBAV') > -1 || ua.indexOf('Messenger') > -1;
+    const isInstagram = ua.indexOf('Instagram') > -1;
+    if (isMessenger || isInstagram) {
+      setIsInAppBrowser(true);
+    }
+  }, []);
 
   // Sync refs with state for tracking logic
   useEffect(() => {
@@ -506,10 +523,15 @@ export default function App() {
             routeRef.current = [newPoint];
           }
         },
-        (error) => console.error("Geolocation error:", error),
+        (error) => {
+          console.error("Geolocation watch error:", error);
+          // If high accuracy fails during tracking, we don't stop, 
+          // but we log it. Most browsers will fallback automatically 
+          // or keep trying.
+        },
         { 
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000,
           maximumAge: 0
         }
       );
@@ -540,18 +562,31 @@ export default function App() {
 
     const options: PositionOptions = {
       enableHighAccuracy: true,
-      timeout: 20000,
+      timeout: 15000,
       maximumAge: 0
     };
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCurrentPos([pos.coords.latitude, pos.coords.longitude]);
+    const onSuccess = (pos: GeolocationPosition) => {
+      setCurrentPos([pos.coords.latitude, pos.coords.longitude]);
+      setIsLocating(false);
+      setPermissionStatus('granted');
+    };
+
+    const onError = (err: GeolocationPositionError) => {
+      console.error("Initial location error:", err);
+      
+      // If high accuracy failed, try one more time with low accuracy
+      if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+        navigator.geolocation.getCurrentPosition(
+          onSuccess,
+          (err2) => {
+            setIsLocating(false);
+            setLocationError(t.gpsSignalWeak);
+          },
+          { ...options, enableHighAccuracy: false, timeout: 10000 }
+        );
+      } else {
         setIsLocating(false);
-        setPermissionStatus('granted');
-      },
-      (err) => {
-        console.error("Initial location error:", err);
         let msg = t.gpsError;
         if (err.code === 1) {
           msg = t.gpsPermissionDenied;
@@ -562,11 +597,11 @@ export default function App() {
           msg = t.gpsTimeout;
         }
         setLocationError(msg);
-        setIsLocating(false);
-      },
-      options
-    );
-  }, []);
+      }
+    };
+
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
+  }, [t]);
 
   // No auto-start to avoid browser blocking
   useEffect(() => {
@@ -891,6 +926,23 @@ export default function App() {
                   <p className="text-zinc-400 mb-8 max-w-xs">
                     {t.locationDesc}
                   </p>
+
+                  {isInAppBrowser && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="mb-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-left"
+                    >
+                      <div className="flex items-center gap-3 mb-2 text-amber-500">
+                        <Globe className="w-5 h-5" />
+                        <span className="font-bold text-sm">{t.inAppBrowserWarning}</span>
+                      </div>
+                      <p className="text-xs text-zinc-400 leading-relaxed">
+                        {t.inAppBrowserDesc}
+                      </p>
+                    </motion.div>
+                  )}
+                  
                   <button 
                     onClick={getInitialLocation}
                     className="w-full max-w-xs py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-emerald-500/20"
