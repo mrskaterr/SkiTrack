@@ -11,6 +11,7 @@ import {
   Navigation, 
   TrendingUp, 
   ArrowDownRight,
+  ArrowUpRight,
   Zap, 
   Settings as SettingsIcon,
   Mountain,
@@ -78,6 +79,8 @@ const translations = {
     micOff: 'Microphone Off',
     slope: 'Slope',
     maxAltitude: 'Max Altitude',
+    maxSlope: 'Max Slope',
+    minSlope: 'Min Slope',
     altitudeCalibration: 'Altitude Calibration',
     altitudeOffset: 'Altitude Offset',
     calibrationDesc: 'Adjust altitude if GPS shows incorrect data (e.g. above sea level).',
@@ -86,7 +89,7 @@ const translations = {
     calibrationSuccess: 'Altitude calibrated!',
     calibrationError: 'Calibration error',
     inAppBrowserWarning: 'In-app browser detected',
-    inAppBrowserDesc: 'Messenger browser often blocks GPS. For best experience, open this page in Chrome or Safari.',
+    inAppBrowserDesc: 'In-app browsers (Facebook, Messenger, Instagram, WhatsApp) often block GPS. For best experience, open this page in Chrome, Safari, Opera, or Edge.',
     openInBrowser: 'Open in Browser'
   },
   de: {
@@ -139,7 +142,9 @@ const translations = {
     micOn: 'Mikrofon An',
     micOff: 'Mikrofon Aus',
     slope: 'Gefälle',
-    maxAltitude: 'Max. Höhe'
+    maxAltitude: 'Max. Höhe',
+    maxSlope: 'Max. Gefälle',
+    minSlope: 'Min. Gefälle'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -191,7 +196,9 @@ const translations = {
     micOn: 'Micrófono encendido',
     micOff: 'Micrófono apagado',
     slope: 'Pendiente',
-    maxAltitude: 'Alt. Máxima'
+    maxAltitude: 'Alt. Máxima',
+    maxSlope: 'Pendiente Máx.',
+    minSlope: 'Pendiente Mín.'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -244,6 +251,8 @@ const translations = {
     micOff: 'Mikrofon wyłączony',
     slope: 'Spadek',
     maxAltitude: 'Wysokość Maks.',
+    maxSlope: 'Spadek Maks.',
+    minSlope: 'Spadek Min.',
     altitudeCalibration: 'Kalibracja Wysokości',
     altitudeOffset: 'Offset Wysokości',
     calibrationDesc: 'Dostosuj wysokość, jeśli GPS pokazuje błędne dane (np. nad poziomem morza).',
@@ -251,8 +260,8 @@ const translations = {
     calibrating: 'Kalibrowanie...',
     calibrationSuccess: 'Wysokość skalibrowana!',
     calibrationError: 'Błąd kalibracji',
-    inAppBrowserWarning: 'Wykryto przeglądarkę Messenger',
-    inAppBrowserDesc: 'Przeglądarka Messenger często blokuje GPS. Dla poprawnego działania otwórz tę stronę w Chrome lub Safari.',
+    inAppBrowserWarning: 'Wykryto przeglądarkę wewnątrz aplikacji',
+    inAppBrowserDesc: 'Przeglądarki wbudowane (Facebook, Messenger, Instagram, WhatsApp) często blokują GPS. Dla poprawnego działania otwórz tę stronę w Chrome, Safari, Opera lub Edge.',
     openInBrowser: 'Otwórz w przeglądarce'
   }
 };
@@ -366,9 +375,10 @@ export default function App() {
   // Detect in-app browser
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
-    const isMessenger = ua.indexOf('FBAN') > -1 || ua.indexOf('FBAV') > -1 || ua.indexOf('Messenger') > -1;
-    const isInstagram = ua.indexOf('Instagram') > -1;
-    if (isMessenger || isInstagram) {
+    const isInApp = 
+      /FBAN|FBAV|Messenger|Instagram|WhatsApp|TikTok|Snapchat|Pinterest|LinkedInApp/i.test(ua);
+    
+    if (isInApp) {
       setIsInAppBrowser(true);
     }
   }, []);
@@ -436,7 +446,9 @@ export default function App() {
         elevationGain: 0,
         elevationLoss: 0,
         currentSlope: 0,
-        maxAltitude: -Infinity
+        maxAltitude: -Infinity,
+        maxSlope: -Infinity,
+        minSlope: Infinity
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -484,6 +496,8 @@ export default function App() {
               let elevationGain = currentStats.elevationGain;
               let elevationLoss = currentStats.elevationLoss;
               let currentSlope = currentStats.currentSlope;
+              let maxSlope = currentStats.maxSlope;
+              let minSlope = currentStats.minSlope;
               
               if (altitude !== null && lastPoint.altitude !== null) {
                 const diff = altitude - lastPoint.altitude;
@@ -494,6 +508,13 @@ export default function App() {
                 // We show "spadek" (descent) as positive, so use (last - current)
                 const slopeVal = ((lastPoint.altitude - altitude) * 100) / d;
                 currentSlope = slopeVal;
+                
+                // Track max and min slope (descent)
+                // Only track if moving (speed > 1 m/s) to avoid noise at standstill
+                if ((speed || 0) > 1) {
+                  maxSlope = Math.max(maxSlope, slopeVal);
+                  minSlope = Math.min(minSlope, slopeVal);
+                }
               }
               
               const updatedStats = {
@@ -503,6 +524,8 @@ export default function App() {
                 elevationGain,
                 elevationLoss,
                 currentSlope,
+                maxSlope,
+                minSlope,
                 maxAltitude: Math.max(currentStats.maxAltitude, smoothedAltitude),
                 avgSpeed: newDistance / ((Date.now() - (startTimeRef.current || Date.now())) / 1000)
               };
@@ -1046,37 +1069,71 @@ export default function App() {
         </div>
 
         {/* Stats Overlay - Top */}
-        <div className="absolute top-3 left-2 right-2 grid grid-cols-5 gap-1 z-10">
-          <StatCard 
-            label={t.distance} 
-            value={(stats.distance / 1000).toFixed(2)} 
-            unit="km" 
-            icon={<Navigation className="w-3.5 h-3.5" />} 
-          />
-          <StatCard 
-            label={t.altitude} 
-            value={((route[route.length - 1]?.altitude || 0) + altitudeOffset).toFixed(0)} 
-            unit="m" 
-            icon={<Mountain className="w-3.5 h-3.5" />} 
-          />
-          <StatCard 
-            label={t.maxAltitude} 
-            value={stats.maxAltitude === -Infinity ? "0" : (stats.maxAltitude + altitudeOffset).toFixed(0)} 
-            unit="m" 
-            icon={<TrendingUp className="w-3.5 h-3.5" />} 
-          />
-          <StatCard 
-            label={t.maxSpeed} 
-            value={formatSpeed(stats.maxSpeed)} 
-            unit="km/h" 
-            icon={<Zap className="w-3.5 h-3.5" />} 
-          />
-          <StatCard 
-            label={t.slope} 
-            value={stats.currentSlope.toFixed(0)} 
-            unit="%" 
-            icon={<ArrowDownRight className="w-3.5 h-3.5" />} 
-          />
+        <div className="absolute top-3 left-0 right-0 z-10 px-2 group">
+          <div className="overflow-x-auto scrollbar-hide snap-x snap-mandatory flex gap-1 pb-1">
+            <div className="flex-shrink-0 w-[23.5%] snap-start">
+              <StatCard 
+                label={t.distance} 
+                value={(stats.distance / 1000).toFixed(2)} 
+                unit="km" 
+                icon={<Navigation className="w-3.5 h-3.5" />} 
+              />
+            </div>
+            <div className="flex-shrink-0 w-[23.5%] snap-start">
+              <StatCard 
+                label={t.altitude} 
+                value={((route[route.length - 1]?.altitude || 0) + altitudeOffset).toFixed(0)} 
+                unit="m" 
+                icon={<Mountain className="w-3.5 h-3.5" />} 
+              />
+            </div>
+            <div className="flex-shrink-0 w-[23.5%] snap-start">
+              <StatCard 
+                label={t.maxAltitude} 
+                value={stats.maxAltitude === -Infinity ? "0" : (stats.maxAltitude + altitudeOffset).toFixed(0)} 
+                unit="m" 
+                icon={<TrendingUp className="w-3.5 h-3.5" />} 
+              />
+            </div>
+            <div className="flex-shrink-0 w-[23.5%] snap-start">
+              <StatCard 
+                label={t.maxSpeed} 
+                value={formatSpeed(stats.maxSpeed)} 
+                unit="km/h" 
+                icon={<Zap className="w-3.5 h-3.5" />} 
+              />
+            </div>
+            <div className="flex-shrink-0 w-[23.5%] snap-start">
+              <StatCard 
+                label={t.slope} 
+                value={stats.currentSlope.toFixed(0)} 
+                unit="%" 
+                icon={<ArrowDownRight className="w-3.5 h-3.5" />} 
+              />
+            </div>
+            <div className="flex-shrink-0 w-[23.5%] snap-start">
+              <StatCard 
+                label={t.maxSlope} 
+                value={stats.maxSlope === -Infinity ? "0" : stats.maxSlope.toFixed(0)} 
+                unit="%" 
+                icon={<ArrowDownRight className="w-3.5 h-3.5 text-red-500" />} 
+              />
+            </div>
+            <div className="flex-shrink-0 w-[23.5%] snap-start">
+              <StatCard 
+                label={t.minSlope} 
+                value={stats.minSlope === Infinity ? "0" : stats.minSlope.toFixed(0)} 
+                unit="%" 
+                icon={<ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />} 
+              />
+            </div>
+          </div>
+          {/* Swipe hint dots */}
+          <div className="flex justify-center gap-1 mt-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
+            <div className="w-1.5 h-1 rounded-full bg-emerald-500"></div>
+            <div className="w-1 h-1 rounded-full bg-zinc-700"></div>
+            <div className="w-1 h-1 rounded-full bg-zinc-700"></div>
+          </div>
         </div>
 
         {/* Controls - Bottom */}
