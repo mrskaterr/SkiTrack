@@ -91,7 +91,9 @@ const translations = {
     calibrationError: 'Calibration error',
     inAppBrowserWarning: 'In-app browser detected',
     inAppBrowserDesc: 'In-app browsers (Facebook, Messenger, Instagram, WhatsApp) often block GPS. For best experience, open this page in Chrome, Safari, Opera, or Edge.',
-    openInBrowser: 'Open in Browser'
+    openInBrowser: 'Open in Browser',
+    falls: 'Falls',
+    fallDetected: 'Fall Detected!'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -145,7 +147,9 @@ const translations = {
     slope: 'Gefälle',
     maxAltitude: 'Max. Höhe',
     maxSlope: 'Max. Gefälle',
-    minSlope: 'Min. Gefälle'
+    minSlope: 'Min. Gefälle',
+    falls: 'Stürze',
+    fallDetected: 'Sturz erkannt!'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -199,7 +203,9 @@ const translations = {
     slope: 'Pendiente',
     maxAltitude: 'Alt. Máxima',
     maxSlope: 'Pendiente Máx.',
-    minSlope: 'Pendiente Mín.'
+    minSlope: 'Pendiente Mín.',
+    falls: 'Caídas',
+    fallDetected: '¡Caída detectada!'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -263,7 +269,9 @@ const translations = {
     calibrationError: 'Błąd kalibracji',
     inAppBrowserWarning: 'Wykryto przeglądarkę wewnątrz aplikacji',
     inAppBrowserDesc: 'Przeglądarki wbudowane (Facebook, Messenger, Instagram, WhatsApp) często blokują GPS. Dla poprawnego działania otwórz tę stronę w Chrome, Safari, Opera lub Edge.',
-    openInBrowser: 'Otwórz w przeglądarce'
+    openInBrowser: 'Otwórz w przeglądarce',
+    falls: 'Upadki',
+    fallDetected: 'Wykryto upadek!'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -334,7 +342,8 @@ export default function App() {
     currentSlope: 0,
     maxAltitude: -Infinity,
     maxSlope: -Infinity,
-    minSlope: Infinity
+    minSlope: Infinity,
+    falls: 0
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -386,6 +395,49 @@ export default function App() {
       setIsInAppBrowser(true);
     }
   }, []);
+
+  const lastFallTime = useRef<number>(0);
+
+  const [showFallAlert, setShowFallAlert] = useState(false);
+
+  // Fall detection logic
+  useEffect(() => {
+    if (!isTracking) return;
+
+    const handleMotion = (event: DeviceMotionEvent) => {
+      const acc = event.accelerationIncludingGravity;
+      if (!acc) return;
+
+      const x = acc.x || 0;
+      const y = acc.y || 0;
+      const z = acc.z || 0;
+
+      // Calculate total acceleration magnitude
+      const magnitude = Math.sqrt(x * x + y * y + z * z);
+      
+      // Threshold for a "fall" (impact). 
+      // 1g is ~9.8 m/s2. A sudden impact of > 3.5g (~35 m/s2) is a good indicator.
+      const FALL_THRESHOLD = 35; 
+      const now = Date.now();
+
+      if (magnitude > FALL_THRESHOLD && now - lastFallTime.current > 5000) {
+        lastFallTime.current = now;
+        // Haptic feedback
+        if ('vibrate' in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
+        setShowFallAlert(true);
+        setTimeout(() => setShowFallAlert(false), 3000);
+        setStats(prev => ({
+          ...prev,
+          falls: prev.falls + 1
+        }));
+      }
+    };
+
+    window.addEventListener('devicemotion', handleMotion);
+    return () => window.removeEventListener('devicemotion', handleMotion);
+  }, [isTracking]);
 
   // Sync refs with state for tracking logic
   useEffect(() => {
@@ -452,7 +504,8 @@ export default function App() {
         currentSlope: 0,
         maxAltitude: -Infinity,
         maxSlope: -Infinity,
-        minSlope: Infinity
+        minSlope: Infinity,
+        falls: 0
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -592,6 +645,18 @@ export default function App() {
       timeout: 15000,
       maximumAge: 0
     };
+
+    // Request motion permission for iOS
+    if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+      try {
+        const response = await (DeviceMotionEvent as any).requestPermission();
+        if (response !== 'granted') {
+          console.warn('Motion permission not granted');
+        }
+      } catch (e) {
+        console.error('Error requesting motion permission:', e);
+      }
+    }
 
     const onSuccess = (pos: GeolocationPosition) => {
       setCurrentPos([pos.coords.latitude, pos.coords.longitude]);
@@ -1061,7 +1126,7 @@ export default function App() {
         {/* Stats Overlay - Top */}
         <div className="absolute top-3 left-0 right-0 z-10 px-2 group">
           <div className="overflow-x-auto scrollbar-hide snap-x snap-mandatory flex gap-1 pb-1">
-            <div className="flex-shrink-0 w-[23.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
                 label={t.distance} 
                 value={(stats.distance / 1000).toFixed(2)} 
@@ -1069,7 +1134,7 @@ export default function App() {
                 icon={<Navigation className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[23.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
                 label={t.altitude} 
                 value={((route[route.length - 1]?.altitude || 0) + altitudeOffset).toFixed(0)} 
@@ -1077,7 +1142,7 @@ export default function App() {
                 icon={<Mountain className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[23.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
                 label={t.maxAltitude} 
                 value={stats.maxAltitude === -Infinity || stats.maxAltitude === undefined ? "0" : (stats.maxAltitude + altitudeOffset).toFixed(0)} 
@@ -1085,7 +1150,7 @@ export default function App() {
                 icon={<TrendingUp className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[23.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
                 label={t.maxSpeed} 
                 value={formatSpeed(stats.maxSpeed)} 
@@ -1093,7 +1158,7 @@ export default function App() {
                 icon={<Zap className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[23.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
                 label={t.slope} 
                 value={stats.currentSlope?.toFixed(0) || "0"} 
@@ -1101,7 +1166,7 @@ export default function App() {
                 icon={<ArrowDownRight className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[23.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
                 label={t.maxSlope} 
                 value={stats.maxSlope === -Infinity || stats.maxSlope === undefined ? "0" : stats.maxSlope.toFixed(0)} 
@@ -1109,7 +1174,7 @@ export default function App() {
                 icon={<ArrowDownRight className="w-3.5 h-3.5 text-red-500" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[23.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
                 label={t.minSlope} 
                 value={stats.minSlope === Infinity || stats.minSlope === undefined ? "0" : stats.minSlope.toFixed(0)} 
@@ -1117,8 +1182,15 @@ export default function App() {
                 icon={<ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />} 
               />
             </div>
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
+              <StatCard 
+                label={t.falls} 
+                value={stats.falls.toString()} 
+                unit="" 
+                icon={<Activity className="w-3.5 h-3.5 text-red-500" />} 
+              />
+            </div>
           </div>
-          {/* Swipe hint dots */}
           <div className="flex justify-center gap-1 mt-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
             <div className="w-1.5 h-1 rounded-full bg-emerald-500"></div>
             <div className="w-1 h-1 rounded-full bg-zinc-700"></div>
@@ -1151,6 +1223,21 @@ export default function App() {
             )}
           </motion.button>
         </div>
+
+        {/* Fall Alert */}
+        <AnimatePresence>
+          {showFallAlert && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-red-500 text-white px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2"
+            >
+              <Activity className="w-5 h-5" />
+              <span>{t.fallDetected}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Side Controls */}
         <div className="absolute right-3 bottom-28 flex flex-col gap-2 z-10">
