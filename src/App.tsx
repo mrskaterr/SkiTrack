@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, Polyline, useMap, Marker, CircleMarker } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { 
   Play, 
   Square, 
@@ -330,7 +331,10 @@ export default function App() {
     totalTime: 0,
     elevationGain: 0,
     elevationLoss: 0,
-    currentSlope: 0
+    currentSlope: 0,
+    maxAltitude: -Infinity,
+    maxSlope: -Infinity,
+    minSlope: Infinity
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -932,76 +936,65 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 relative">
         {/* Loading / Error / Start States */}
-        <AnimatePresence>
-          {(!hasStarted || isLocating || locationError) && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-[60] bg-zinc-950 flex flex-col items-center justify-center p-8 text-center"
-            >
-              {!hasStarted ? (
-                <>
-                  <div className="p-6 bg-emerald-500/10 rounded-full mb-6">
-                    <Navigation className="w-12 h-12 text-emerald-500" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-zinc-100 mb-3">{t.requiredLocation}</h2>
-                  <p className="text-zinc-400 mb-8 max-w-xs">
-                    {t.locationDesc}
-                  </p>
+        {(!hasStarted || isLocating || locationError) && (
+          <div className="absolute inset-0 z-[60] bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
+            {!hasStarted ? (
+              <>
+                <div className="p-6 bg-emerald-500/10 rounded-full mb-6">
+                  <Navigation className="w-12 h-12 text-emerald-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-zinc-100 mb-3">{t.requiredLocation}</h2>
+                <p className="text-zinc-400 mb-8 max-w-xs">
+                  {t.locationDesc}
+                </p>
 
-                  {isInAppBrowser && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="mb-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-left"
-                    >
-                      <div className="flex items-center gap-3 mb-2 text-amber-500">
-                        <Globe className="w-5 h-5" />
-                        <span className="font-bold text-sm">{t.inAppBrowserWarning}</span>
-                      </div>
-                      <p className="text-xs text-zinc-400 leading-relaxed">
-                        {t.inAppBrowserDesc}
-                      </p>
-                    </motion.div>
-                  )}
-                  
-                  <button 
-                    onClick={getInitialLocation}
-                    className="w-full max-w-xs py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-emerald-500/20"
-                  >
-                    {t.shareLocation}
-                  </button>
-                </>
-              ) : isLocating ? (
-                <>
-                  <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
-                  <p className="text-zinc-400 font-medium tracking-wide">{t.searching}</p>
-                  <p className="text-zinc-500 text-sm mt-2">{t.gpsSignalWeak}</p>
-                </>
-              ) : (
-                <>
-                  <div className="p-4 bg-red-500/10 rounded-full mb-4">
-                    <Activity className="w-8 h-8 text-red-500" />
+                {isInAppBrowser && (
+                  <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-left">
+                    <div className="flex items-center gap-3 mb-2 text-amber-500">
+                      <Globe className="w-5 h-5" />
+                      <span className="font-bold text-sm">{t.inAppBrowserWarning}</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      {t.inAppBrowserDesc}
+                    </p>
                   </div>
-                  <h2 className="text-xl font-bold text-zinc-100 mb-2">
-                    {permissionStatus === 'denied' ? t.noPermission : t.gpsError}
-                  </h2>
-                  <p className="text-zinc-400 mb-6 max-w-xs">{locationError}</p>
-                  <button 
-                    onClick={getInitialLocation}
-                    className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-all shadow-xl shadow-emerald-500/20"
-                  >
-                    {t.tryAgain}
-                  </button>
-                  <p className="text-zinc-500 text-xs mt-6 max-w-[240px]">
-                    Jeśli używasz aplikacji APK, upewnij się, że przy jej tworzeniu zaznaczono uprawnienia GPS (ACCESS_FINE_LOCATION).
-                  </p>
-                </>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                )}
+                
+                <button 
+                  onClick={getInitialLocation}
+                  className="w-full max-w-xs py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold text-lg transition-all shadow-xl shadow-emerald-500/20"
+                >
+                  {t.shareLocation}
+                </button>
+              </>
+            ) : isLocating ? (
+              <>
+                <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4" />
+                <p className="text-zinc-400 font-medium tracking-wide">{t.searching}</p>
+                <p className="text-zinc-500 text-sm mt-2">{t.gpsSignalWeak}</p>
+              </>
+            ) : (
+              <>
+                <div className="p-4 bg-red-500/10 rounded-full mb-4">
+                  <Activity className="w-8 h-8 text-red-500" />
+                </div>
+                <h2 className="text-xl font-bold text-zinc-100 mb-2">
+                  {permissionStatus === 'denied' ? t.noPermission : t.gpsError}
+                </h2>
+                <p className="text-zinc-400 mb-6 max-w-xs">{locationError}</p>
+                <button 
+                  onClick={getInitialLocation}
+                  className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-all shadow-xl shadow-emerald-500/20"
+                >
+                  {t.tryAgain}
+                </button>
+                <p className="text-zinc-500 text-xs mt-6 max-w-[240px]">
+                  Jeśli używasz aplikacji APK, upewnij się, że przy jej tworzeniu zaznaczono uprawnienia GPS (ACCESS_FINE_LOCATION).
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Map Container */}
         <div className="absolute inset-0 z-0">
@@ -1090,7 +1083,7 @@ export default function App() {
             <div className="flex-shrink-0 w-[23.5%] snap-start">
               <StatCard 
                 label={t.maxAltitude} 
-                value={stats.maxAltitude === -Infinity ? "0" : (stats.maxAltitude + altitudeOffset).toFixed(0)} 
+                value={stats.maxAltitude === -Infinity || stats.maxAltitude === undefined ? "0" : (stats.maxAltitude + altitudeOffset).toFixed(0)} 
                 unit="m" 
                 icon={<TrendingUp className="w-3.5 h-3.5" />} 
               />
@@ -1106,7 +1099,7 @@ export default function App() {
             <div className="flex-shrink-0 w-[23.5%] snap-start">
               <StatCard 
                 label={t.slope} 
-                value={stats.currentSlope.toFixed(0)} 
+                value={stats.currentSlope?.toFixed(0) || "0"} 
                 unit="%" 
                 icon={<ArrowDownRight className="w-3.5 h-3.5" />} 
               />
@@ -1114,7 +1107,7 @@ export default function App() {
             <div className="flex-shrink-0 w-[23.5%] snap-start">
               <StatCard 
                 label={t.maxSlope} 
-                value={stats.maxSlope === -Infinity ? "0" : stats.maxSlope.toFixed(0)} 
+                value={stats.maxSlope === -Infinity || stats.maxSlope === undefined ? "0" : stats.maxSlope.toFixed(0)} 
                 unit="%" 
                 icon={<ArrowDownRight className="w-3.5 h-3.5 text-red-500" />} 
               />
@@ -1122,7 +1115,7 @@ export default function App() {
             <div className="flex-shrink-0 w-[23.5%] snap-start">
               <StatCard 
                 label={t.minSlope} 
-                value={stats.minSlope === Infinity ? "0" : stats.minSlope.toFixed(0)} 
+                value={stats.minSlope === Infinity || stats.minSlope === undefined ? "0" : stats.minSlope.toFixed(0)} 
                 unit="%" 
                 icon={<ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />} 
               />
@@ -1460,8 +1453,8 @@ export default function App() {
             <div className={`w-1.5 h-1.5 rounded-full ${isTracking ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-700'}`} />
             {t.gpsStatus}: {currentPos ? t.locked : t.searching}
           </span>
-          <span>Lat: {currentPos?.[0].toFixed(4) || '---'}</span>
-          <span>Lng: {currentPos?.[1].toFixed(4) || '---'}</span>
+          <span>Lat: {currentPos?.[0]?.toFixed(4) || '---'}</span>
+          <span>Lng: {currentPos?.[1]?.toFixed(4) || '---'}</span>
         </div>
         <div>v1.0.4-stable</div>
       </footer>
@@ -1471,10 +1464,8 @@ export default function App() {
 
 function StatCard({ label, value, unit, icon }: { label: string, value: string, unit: string, icon: React.ReactNode }) {
   return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 p-1.5 rounded-xl shadow-lg flex flex-col justify-center min-w-0"
+    <div 
+      className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 p-1.5 rounded-xl shadow-lg flex flex-col justify-center min-w-0 transition-all"
     >
       <div className="flex items-center gap-1 text-zinc-500 mb-0.5 overflow-hidden">
         <span className="shrink-0">{icon}</span>
@@ -1484,7 +1475,7 @@ function StatCard({ label, value, unit, icon }: { label: string, value: string, 
         <span className="text-sm font-mono font-bold text-zinc-100 truncate">{value}</span>
         <span className="text-[8px] text-zinc-500 font-medium shrink-0">{unit}</span>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
