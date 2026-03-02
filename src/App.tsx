@@ -37,6 +37,7 @@ const translations = {
     altitude: 'Altitude',
     speed: 'Speed',
     maxSpeed: 'Max Speed',
+    avgSpeed: 'Avg. Speed',
     start: 'Start',
     stop: 'Stop',
     gpsStatus: 'GPS Status',
@@ -103,6 +104,7 @@ const translations = {
     altitude: 'Höhe',
     speed: 'Tempo',
     maxSpeed: 'Max. Tempo',
+    avgSpeed: 'Durchschn. Tempo',
     start: 'Start',
     stop: 'Stopp',
     gpsStatus: 'GPS-Status',
@@ -159,6 +161,7 @@ const translations = {
     altitude: 'Altitud',
     speed: 'Velocidad',
     maxSpeed: 'Vel. Máxima',
+    avgSpeed: 'Vel. Media',
     start: 'Empezar',
     stop: 'Detener',
     gpsStatus: 'Estado GPS',
@@ -215,6 +218,7 @@ const translations = {
     altitude: 'Wysokość',
     speed: 'Prędkość',
     maxSpeed: 'Prędkość Maks.',
+    avgSpeed: 'Prędkość Śr.',
     start: 'Start',
     stop: 'Stop',
     gpsStatus: 'Status GPS',
@@ -989,8 +993,13 @@ export default function App() {
             </div>
           </div>
           <div className="flex flex-col items-end">
-            <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">{t.duration}</span>
-            <span className="text-lg font-mono font-bold text-emerald-400 leading-none">{formatTime(elapsedTime)}</span>
+            <span className="text-[10px] text-zinc-500 font-mono uppercase leading-none mb-1">{t.altitude}</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-mono font-bold text-emerald-400 leading-none">
+                {((route[route.length - 1]?.altitude || 0) + altitudeOffset).toFixed(0)}
+              </span>
+              <span className="text-[9px] text-zinc-500 font-medium">m</span>
+            </div>
           </div>
         </div>
       </header>
@@ -1136,10 +1145,10 @@ export default function App() {
             </div>
             <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
-                label={t.altitude} 
-                value={((route[route.length - 1]?.altitude || 0) + altitudeOffset).toFixed(0)} 
-                unit="m" 
-                icon={<Mountain className="w-3.5 h-3.5" />} 
+                label={t.avgSpeed} 
+                value={formatSpeed(stats.avgSpeed)} 
+                unit="km/h" 
+                icon={<Activity className="w-3.5 h-3.5" />} 
               />
             </div>
             <div className="flex-shrink-0 w-[32.5%] snap-start">
@@ -1211,15 +1220,23 @@ export default function App() {
             }`}
           >
             {isTracking ? (
-              <>
-                <Square className="w-5 h-5 fill-current" />
-                {t.stop}
-              </>
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-3">
+                  <Square className="w-5 h-5 fill-current" />
+                  <span>{t.stop}</span>
+                </div>
+                <span className="text-sm font-mono opacity-80 mt-1">{formatTime(elapsedTime)}</span>
+              </div>
             ) : (
-              <>
-                <Play className="w-5 h-5 fill-current" />
-                {t.start}
-              </>
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-3">
+                  <Play className="w-5 h-5 fill-current" />
+                  <span>{t.start}</span>
+                </div>
+                {elapsedTime > 0 && (
+                  <span className="text-sm font-mono opacity-80 mt-1">{formatTime(elapsedTime)}</span>
+                )}
+              </div>
             )}
           </motion.button>
         </div>
