@@ -7,7 +7,7 @@ export async function generateAppIcon() {
     contents: {
       parts: [
         {
-          text: 'A professional app icon for a ski tracking application called "SkiTrack Pro". The icon should feature a stylized mountain peak with a glowing emerald green path winding down it, representing a GPS track. Dark minimalist background, high contrast, sleek modern design, vector style, 1:1 aspect ratio.',
+          text: 'A professional app icon for a ski tracking application called "SkiTrack". The icon should feature a stylized mountain peak with a glowing emerald green path winding down it, representing a GPS track. Dark minimalist background, high contrast, sleek modern design, vector style, 1:1 aspect ratio.',
         },
       ],
     },

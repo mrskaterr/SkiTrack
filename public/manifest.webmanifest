@@ -1,5 +1,5 @@
 {
-  "name": "SkiTrack Pro",
+  "name": "SkiTrack",
   "short_name": "SkiTrack",
   "description": "Real-time ski route tracker with speed, distance, and altitude monitoring.",
   "start_url": "/",
