@@ -1251,14 +1251,14 @@ export default function App() {
               />
             </div>
           </div>
-          <div className="flex justify-center gap-1 mt-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
+          <div className="flex justify-center gap-1.5 mt-1">
             {[0, 1, 2, 3].map((page) => (
               <div 
                 key={page}
-                className={`transition-all duration-300 rounded-full ${
+                className={`transition-all duration-300 rounded-full shadow-sm ${
                   activeStatsPage === page 
-                    ? 'w-3 h-1 bg-emerald-500' 
-                    : 'w-1 h-1 bg-zinc-700'
+                    ? 'w-4 h-1.5 bg-emerald-400 shadow-emerald-500/20' 
+                    : 'w-1.5 h-1.5 bg-white/40'
                 }`}
               />
             ))}
