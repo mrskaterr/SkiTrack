@@ -381,6 +381,7 @@ export default function App() {
   const [isMicActive, setIsMicActive] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [activeStatsPage, setActiveStatsPage] = useState(0);
   
   const socketRef = useRef<Socket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -496,6 +497,14 @@ export default function App() {
     } catch (err) {
       console.error("Auto-calibration error:", err);
     }
+  };
+
+  const handleStatsScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const scrollLeft = container.scrollLeft;
+    const width = container.offsetWidth;
+    const page = Math.round(scrollLeft / width);
+    setActiveStatsPage(page);
   };
 
   const toggleTracking = useCallback(() => {
@@ -1157,7 +1166,10 @@ export default function App() {
 
         {/* Stats Overlay - Top */}
         <div className="absolute top-3 left-0 right-0 z-10 px-2 group">
-          <div className="overflow-x-auto scrollbar-hide snap-x snap-mandatory flex gap-1 pb-1">
+          <div 
+            onScroll={handleStatsScroll}
+            className="overflow-x-auto scrollbar-hide snap-x snap-mandatory flex gap-1 pb-1"
+          >
             <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
                 label={t.distance} 
@@ -1166,7 +1178,7 @@ export default function App() {
                 icon={<Navigation className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[32.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
                 label={t.avgSpeed} 
                 value={formatSpeed(stats.avgSpeed)} 
@@ -1174,7 +1186,7 @@ export default function App() {
                 icon={<Activity className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[32.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
                 label={t.maxAltitude} 
                 value={stats.maxAltitude === -Infinity || stats.maxAltitude === undefined ? "0" : (stats.maxAltitude + altitudeOffset).toFixed(0)} 
@@ -1190,7 +1202,7 @@ export default function App() {
                 icon={<Zap className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[32.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
                 label={t.slope} 
                 value={stats.currentSlope?.toFixed(0) || "0"} 
@@ -1198,7 +1210,7 @@ export default function App() {
                 icon={<ArrowDownRight className="w-3.5 h-3.5" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[32.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
                 label={t.maxSlope} 
                 value={stats.maxSlope === -Infinity || stats.maxSlope === undefined ? "0" : stats.maxSlope.toFixed(0)} 
@@ -1214,7 +1226,7 @@ export default function App() {
                 icon={<ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[32.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
                 label={t.falls35g} 
                 value={stats.falls35g.toString()} 
@@ -1222,7 +1234,7 @@ export default function App() {
                 icon={<Activity className="w-3.5 h-3.5 text-red-600" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[32.5%] snap-start">
+            <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
                 label={t.falls20g} 
                 value={stats.falls20g.toString()} 
@@ -1240,9 +1252,16 @@ export default function App() {
             </div>
           </div>
           <div className="flex justify-center gap-1 mt-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
-            <div className="w-1.5 h-1 rounded-full bg-emerald-500"></div>
-            <div className="w-1 h-1 rounded-full bg-zinc-700"></div>
-            <div className="w-1 h-1 rounded-full bg-zinc-700"></div>
+            {[0, 1, 2, 3].map((page) => (
+              <div 
+                key={page}
+                className={`transition-all duration-300 rounded-full ${
+                  activeStatsPage === page 
+                    ? 'w-3 h-1 bg-emerald-500' 
+                    : 'w-1 h-1 bg-zinc-700'
+                }`}
+              />
+            ))}
           </div>
         </div>
 
