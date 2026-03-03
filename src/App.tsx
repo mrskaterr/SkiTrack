@@ -1255,10 +1255,10 @@ export default function App() {
             {[0, 1, 2, 3].map((page) => (
               <div 
                 key={page}
-                className={`transition-all duration-300 rounded-full shadow-sm ${
+                className={`transition-all duration-300 rounded-full shadow-sm ring-1 ring-black/40 ${
                   activeStatsPage === page 
                     ? 'w-4 h-1.5 bg-emerald-400 shadow-emerald-500/20' 
-                    : 'w-1.5 h-1.5 bg-white/40'
+                    : 'w-1.5 h-1.5 bg-white/60'
                 }`}
               />
             ))}
