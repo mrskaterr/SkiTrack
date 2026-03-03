@@ -94,7 +94,7 @@ const translations = {
     inAppBrowserDesc: 'In-app browsers (Facebook, Messenger, Instagram, WhatsApp) often block GPS. For best experience, open this page in Chrome, Safari, Opera, or Edge.',
     openInBrowser: 'Open in Browser',
     falls35g: 'Falls 3.5g',
-    falls25g: 'Falls 2.5g',
+    falls30g: 'Falls 3g',
     fallDetected: 'Fall Detected!'
   },
   de: {
@@ -152,7 +152,7 @@ const translations = {
     maxSlope: 'Max. Gefälle',
     minSlope: 'Min. Gefälle',
     falls35g: 'Stürze 3.5g',
-    falls25g: 'Stürze 2.5g',
+    falls30g: 'Stürze 3g',
     fallDetected: 'Sturz erkannt!'
   },
   es: {
@@ -210,7 +210,7 @@ const translations = {
     maxSlope: 'Pendiente Máx.',
     minSlope: 'Pendiente Mín.',
     falls35g: 'Caídas 3.5g',
-    falls25g: 'Caídas 2.5g',
+    falls30g: 'Caídas 3g',
     fallDetected: '¡Caída detectada!'
   },
   pl: {
@@ -278,7 +278,7 @@ const translations = {
     inAppBrowserDesc: 'Przeglądarki wbudowane (Facebook, Messenger, Instagram, WhatsApp) często blokują GPS. Dla poprawnego działania otwórz tę stronę w Chrome, Safari, Opera lub Edge.',
     openInBrowser: 'Otwórz w przeglądarce',
     falls35g: 'Upadki 3.5g',
-    falls25g: 'Upadki 2.5g',
+    falls30g: 'Upadki 3g',
     fallDetected: 'Wykryto upadek!'
   }
 };
@@ -352,7 +352,7 @@ export default function App() {
     maxSlope: -Infinity,
     minSlope: Infinity,
     falls35g: 0,
-    falls25g: 0
+    falls30g: 0
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -428,10 +428,10 @@ export default function App() {
       // Threshold for a "fall" (impact). 
       // 1g is ~9.8 m/s2. 
       const THRESHOLD_35G = 35; 
-      const THRESHOLD_25G = 25;
+      const THRESHOLD_30G = 30;
       const now = Date.now();
 
-      if (magnitude > THRESHOLD_25G && now - lastFallTime.current > 2000) {
+      if (magnitude > THRESHOLD_30G && now - lastFallTime.current > 2000) {
         lastFallTime.current = now;
         // Haptic feedback for any fall
         if ('vibrate' in navigator) {
@@ -446,7 +446,7 @@ export default function App() {
           if (magnitude > THRESHOLD_35G) {
             newStats.falls35g = (prev.falls35g || 0) + 1;
           } else {
-            newStats.falls25g = (prev.falls25g || 0) + 1;
+            newStats.falls30g = (prev.falls30g || 0) + 1;
           }
           return newStats;
         });
@@ -532,7 +532,7 @@ export default function App() {
         maxSlope: -Infinity,
         minSlope: Infinity,
         falls35g: 0,
-        falls25g: 0
+        falls30g: 0
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -1227,8 +1227,8 @@ export default function App() {
             </div>
             <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
-                label={t.falls25g} 
-                value={stats.falls25g.toString()} 
+                label={t.falls30g} 
+                value={stats.falls30g.toString()} 
                 unit="" 
                 icon={<Activity className="w-3.5 h-3.5 text-orange-500" />} 
               />
