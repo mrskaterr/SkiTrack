@@ -93,7 +93,9 @@ const translations = {
     inAppBrowserWarning: 'In-app browser detected',
     inAppBrowserDesc: 'In-app browsers (Facebook, Messenger, Instagram, WhatsApp) often block GPS. For best experience, open this page in Chrome, Safari, Opera, or Edge.',
     openInBrowser: 'Open in Browser',
-    falls: 'Falls',
+    falls35g: 'Falls 3.5g',
+    falls20g: 'Falls 2g',
+    falls10g: 'Falls 1g',
     fallDetected: 'Fall Detected!'
   },
   de: {
@@ -150,7 +152,9 @@ const translations = {
     maxAltitude: 'Max. Höhe',
     maxSlope: 'Max. Gefälle',
     minSlope: 'Min. Gefälle',
-    falls: 'Stürze',
+    falls35g: 'Stürze 3.5g',
+    falls20g: 'Stürze 2g',
+    falls10g: 'Stürze 1g',
     fallDetected: 'Sturz erkannt!'
   },
   es: {
@@ -207,7 +211,9 @@ const translations = {
     maxAltitude: 'Alt. Máxima',
     maxSlope: 'Pendiente Máx.',
     minSlope: 'Pendiente Mín.',
-    falls: 'Caídas',
+    falls35g: 'Caídas 3.5g',
+    falls20g: 'Caídas 2g',
+    falls10g: 'Caídas 1g',
     fallDetected: '¡Caída detectada!'
   },
   pl: {
@@ -274,7 +280,9 @@ const translations = {
     inAppBrowserWarning: 'Wykryto przeglądarkę wewnątrz aplikacji',
     inAppBrowserDesc: 'Przeglądarki wbudowane (Facebook, Messenger, Instagram, WhatsApp) często blokują GPS. Dla poprawnego działania otwórz tę stronę w Chrome, Safari, Opera lub Edge.',
     openInBrowser: 'Otwórz w przeglądarce',
-    falls: 'Upadki',
+    falls35g: 'Upadki 3.5g',
+    falls20g: 'Upadki 2g',
+    falls10g: 'Upadki 1g',
     fallDetected: 'Wykryto upadek!'
   }
 };
@@ -347,7 +355,9 @@ export default function App() {
     maxAltitude: -Infinity,
     maxSlope: -Infinity,
     minSlope: Infinity,
-    falls: 0
+    falls35g: 0,
+    falls20g: 0,
+    falls10g: 0
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -420,22 +430,33 @@ export default function App() {
       const magnitude = Math.sqrt(x * x + y * y + z * z);
       
       // Threshold for a "fall" (impact). 
-      // 1g is ~9.8 m/s2. A sudden impact of > 3.5g (~35 m/s2) is a good indicator.
-      const FALL_THRESHOLD = 35; 
+      // 1g is ~9.8 m/s2. 
+      const THRESHOLD_35G = 35; 
+      const THRESHOLD_20G = 20;
+      const THRESHOLD_10G = 10;
       const now = Date.now();
 
-      if (magnitude > FALL_THRESHOLD && now - lastFallTime.current > 5000) {
+      if (magnitude > THRESHOLD_10G && now - lastFallTime.current > 2000) {
         lastFallTime.current = now;
-        // Haptic feedback
+        // Haptic feedback for any fall
         if ('vibrate' in navigator) {
-          navigator.vibrate([200, 100, 200]);
+          navigator.vibrate([100]);
         }
+        
         setShowFallAlert(true);
         setTimeout(() => setShowFallAlert(false), 3000);
-        setStats(prev => ({
-          ...prev,
-          falls: prev.falls + 1
-        }));
+
+        setStats(prev => {
+          const newStats = { ...prev };
+          if (magnitude > THRESHOLD_35G) {
+            newStats.falls35g = (prev.falls35g || 0) + 1;
+          } else if (magnitude > THRESHOLD_20G) {
+            newStats.falls20g = (prev.falls20g || 0) + 1;
+          } else {
+            newStats.falls10g = (prev.falls10g || 0) + 1;
+          }
+          return newStats;
+        });
       }
     };
 
@@ -509,7 +530,9 @@ export default function App() {
         maxAltitude: -Infinity,
         maxSlope: -Infinity,
         minSlope: Infinity,
-        falls: 0
+        falls35g: 0,
+        falls20g: 0,
+        falls10g: 0
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -1193,10 +1216,26 @@ export default function App() {
             </div>
             <div className="flex-shrink-0 w-[32.5%] snap-start">
               <StatCard 
-                label={t.falls} 
-                value={stats.falls.toString()} 
+                label={t.falls35g} 
+                value={stats.falls35g.toString()} 
                 unit="" 
-                icon={<Activity className="w-3.5 h-3.5 text-red-500" />} 
+                icon={<Activity className="w-3.5 h-3.5 text-red-600" />} 
+              />
+            </div>
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
+              <StatCard 
+                label={t.falls20g} 
+                value={stats.falls20g.toString()} 
+                unit="" 
+                icon={<Activity className="w-3.5 h-3.5 text-orange-500" />} 
+              />
+            </div>
+            <div className="flex-shrink-0 w-[32.5%] snap-start">
+              <StatCard 
+                label={t.falls10g} 
+                value={stats.falls10g.toString()} 
+                unit="" 
+                icon={<Activity className="w-3.5 h-3.5 text-yellow-500" />} 
               />
             </div>
           </div>

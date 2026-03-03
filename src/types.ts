@@ -17,5 +17,7 @@ export interface SessionStats {
   maxAltitude: number; // in meters
   maxSlope: number; // in percentage
   minSlope: number; // in percentage
-  falls: number;
+  falls35g: number;
+  falls20g: number;
+  falls10g: number;
 }
