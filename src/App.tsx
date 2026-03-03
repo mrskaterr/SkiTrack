@@ -95,7 +95,6 @@ const translations = {
     openInBrowser: 'Open in Browser',
     falls35g: 'Falls 3.5g',
     falls20g: 'Falls 2g',
-    falls10g: 'Falls 1g',
     fallDetected: 'Fall Detected!'
   },
   de: {
@@ -154,7 +153,6 @@ const translations = {
     minSlope: 'Min. Gefälle',
     falls35g: 'Stürze 3.5g',
     falls20g: 'Stürze 2g',
-    falls10g: 'Stürze 1g',
     fallDetected: 'Sturz erkannt!'
   },
   es: {
@@ -213,7 +211,6 @@ const translations = {
     minSlope: 'Pendiente Mín.',
     falls35g: 'Caídas 3.5g',
     falls20g: 'Caídas 2g',
-    falls10g: 'Caídas 1g',
     fallDetected: '¡Caída detectada!'
   },
   pl: {
@@ -282,7 +279,6 @@ const translations = {
     openInBrowser: 'Otwórz w przeglądarce',
     falls35g: 'Upadki 3.5g',
     falls20g: 'Upadki 2g',
-    falls10g: 'Upadki 1g',
     fallDetected: 'Wykryto upadek!'
   }
 };
@@ -356,8 +352,7 @@ export default function App() {
     maxSlope: -Infinity,
     minSlope: Infinity,
     falls35g: 0,
-    falls20g: 0,
-    falls10g: 0
+    falls20g: 0
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -434,10 +429,9 @@ export default function App() {
       // 1g is ~9.8 m/s2. 
       const THRESHOLD_35G = 35; 
       const THRESHOLD_20G = 20;
-      const THRESHOLD_10G = 10;
       const now = Date.now();
 
-      if (magnitude > THRESHOLD_10G && now - lastFallTime.current > 2000) {
+      if (magnitude > THRESHOLD_20G && now - lastFallTime.current > 2000) {
         lastFallTime.current = now;
         // Haptic feedback for any fall
         if ('vibrate' in navigator) {
@@ -451,10 +445,8 @@ export default function App() {
           const newStats = { ...prev };
           if (magnitude > THRESHOLD_35G) {
             newStats.falls35g = (prev.falls35g || 0) + 1;
-          } else if (magnitude > THRESHOLD_20G) {
-            newStats.falls20g = (prev.falls20g || 0) + 1;
           } else {
-            newStats.falls10g = (prev.falls10g || 0) + 1;
+            newStats.falls20g = (prev.falls20g || 0) + 1;
           }
           return newStats;
         });
@@ -540,8 +532,7 @@ export default function App() {
         maxSlope: -Infinity,
         minSlope: Infinity,
         falls35g: 0,
-        falls20g: 0,
-        falls10g: 0
+        falls20g: 0
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -1242,17 +1233,11 @@ export default function App() {
                 icon={<Activity className="w-3.5 h-3.5 text-orange-500" />} 
               />
             </div>
-            <div className="flex-shrink-0 w-[32.5%] snap-start">
-              <StatCard 
-                label={t.falls10g} 
-                value={stats.falls10g.toString()} 
-                unit="" 
-                icon={<Activity className="w-3.5 h-3.5 text-yellow-500" />} 
-              />
-            </div>
+            {/* Spacer to allow last item to snap to start */}
+            <div className="flex-shrink-0 w-[67.5%]" />
           </div>
           <div className="flex justify-center gap-1.5 mt-1">
-            {[0, 1, 2, 3].map((page) => (
+            {[0, 1, 2].map((page) => (
               <div 
                 key={page}
                 className={`transition-all duration-300 rounded-full shadow-sm ring-1 ring-black/40 ${

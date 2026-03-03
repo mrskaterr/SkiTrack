@@ -19,5 +19,4 @@ export interface SessionStats {
   minSlope: number; // in percentage
   falls35g: number;
   falls20g: number;
-  falls10g: number;
 }
