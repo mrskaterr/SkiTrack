@@ -93,8 +93,8 @@ const translations = {
     inAppBrowserWarning: 'In-app browser detected',
     inAppBrowserDesc: 'In-app browsers (Facebook, Messenger, Instagram, WhatsApp) often block GPS. For best experience, open this page in Chrome, Safari, Opera, or Edge.',
     openInBrowser: 'Open in Browser',
-    falls35g: 'Falls 3.5g',
-    falls30g: 'Falls 3g',
+    falls8g: 'Falls 8g',
+    falls5g: 'Falls 5g',
     fallDetected: 'Fall Detected!'
   },
   de: {
@@ -151,8 +151,8 @@ const translations = {
     maxAltitude: 'Max. Höhe',
     maxSlope: 'Max. Gefälle',
     minSlope: 'Min. Gefälle',
-    falls35g: 'Stürze 3.5g',
-    falls30g: 'Stürze 3g',
+    falls8g: 'Stürze 8g',
+    falls5g: 'Stürze 5g',
     fallDetected: 'Sturz erkannt!'
   },
   es: {
@@ -209,8 +209,8 @@ const translations = {
     maxAltitude: 'Alt. Máxima',
     maxSlope: 'Pendiente Máx.',
     minSlope: 'Pendiente Mín.',
-    falls35g: 'Caídas 3.5g',
-    falls30g: 'Caídas 3g',
+    falls8g: 'Caídas 8g',
+    falls5g: 'Caídas 5g',
     fallDetected: '¡Caída detectada!'
   },
   pl: {
@@ -277,8 +277,8 @@ const translations = {
     inAppBrowserWarning: 'Wykryto przeglądarkę wewnątrz aplikacji',
     inAppBrowserDesc: 'Przeglądarki wbudowane (Facebook, Messenger, Instagram, WhatsApp) często blokują GPS. Dla poprawnego działania otwórz tę stronę w Chrome, Safari, Opera lub Edge.',
     openInBrowser: 'Otwórz w przeglądarce',
-    falls35g: 'Upadki 3.5g',
-    falls30g: 'Upadki 3g',
+    falls8g: 'Upadki 8g',
+    falls5g: 'Upadki 5g',
     fallDetected: 'Wykryto upadek!'
   }
 };
@@ -351,8 +351,8 @@ export default function App() {
     maxAltitude: -Infinity,
     maxSlope: -Infinity,
     minSlope: Infinity,
-    falls35g: 0,
-    falls30g: 0
+    falls8g: 0,
+    falls5g: 0
   });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -407,6 +407,7 @@ export default function App() {
   }, []);
 
   const lastFallTime = useRef<number>(0);
+  const lastWeightlessTime = useRef<number>(0);
 
   const [showFallAlert, setShowFallAlert] = useState(false);
 
@@ -425,17 +426,31 @@ export default function App() {
       // Calculate total acceleration magnitude
       const magnitude = Math.sqrt(x * x + y * y + z * z);
       
-      // Threshold for a "fall" (impact). 
-      // 1g is ~9.8 m/s2. 
-      const THRESHOLD_35G = 35; 
-      const THRESHOLD_30G = 30;
       const now = Date.now();
 
-      if (magnitude > THRESHOLD_30G && now - lastFallTime.current > 2000) {
+      // 1. Detect weightlessness (free fall phase)
+      // Normal gravity is ~9.8. If < 4.0, we are likely falling or in the air.
+      if (magnitude < 4.0) {
+        lastWeightlessTime.current = now;
+      }
+
+      // 2. Detect impact
+      // Thresholds: 5g (50 m/s2) and 8g (80 m/s2)
+      const THRESHOLD_8G = 80; 
+      const THRESHOLD_5G = 50;
+
+      // Fall is detected if:
+      // - Magnitude exceeds threshold
+      // - It's been at least 2s since last fall
+      // - There was a "weightless" moment in the last 500ms (filters out hand waves)
+      if (magnitude > THRESHOLD_5G && 
+          now - lastFallTime.current > 2000 && 
+          now - lastWeightlessTime.current < 500) {
+        
         lastFallTime.current = now;
         // Haptic feedback for any fall
         if ('vibrate' in navigator) {
-          navigator.vibrate([100]);
+          navigator.vibrate([100, 50, 100]);
         }
         
         setShowFallAlert(true);
@@ -443,10 +458,10 @@ export default function App() {
 
         setStats(prev => {
           const newStats = { ...prev };
-          if (magnitude > THRESHOLD_35G) {
-            newStats.falls35g = (prev.falls35g || 0) + 1;
+          if (magnitude > THRESHOLD_8G) {
+            newStats.falls8g = (prev.falls8g || 0) + 1;
           } else {
-            newStats.falls30g = (prev.falls30g || 0) + 1;
+            newStats.falls5g = (prev.falls5g || 0) + 1;
           }
           return newStats;
         });
@@ -531,8 +546,8 @@ export default function App() {
         maxAltitude: -Infinity,
         maxSlope: -Infinity,
         minSlope: Infinity,
-        falls35g: 0,
-        falls30g: 0
+        falls8g: 0,
+        falls5g: 0
       };
       setStats(initialStats);
       statsRef.current = initialStats;
@@ -1219,16 +1234,16 @@ export default function App() {
             </div>
             <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
-                label={t.falls35g} 
-                value={stats.falls35g.toString()} 
+                label={t.falls8g} 
+                value={stats.falls8g.toString()} 
                 unit="" 
                 icon={<Activity className="w-3.5 h-3.5 text-red-600" />} 
               />
             </div>
             <div className="flex-shrink-0 w-[32.5%]">
               <StatCard 
-                label={t.falls30g} 
-                value={stats.falls30g.toString()} 
+                label={t.falls5g} 
+                value={stats.falls5g.toString()} 
                 unit="" 
                 icon={<Activity className="w-3.5 h-3.5 text-orange-500" />} 
               />
