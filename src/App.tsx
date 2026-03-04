@@ -117,7 +117,8 @@ const translations = {
     searchPlaceholder: 'Search for a resort...',
     nearbyResorts: 'Nearby Ski Resorts',
     noResortsFound: 'No resorts found nearby.',
-    searchingResorts: 'Searching for resorts...'
+    searchingResorts: 'Searching for resorts...',
+    locationRequired: 'Location required for nearby search.'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -193,7 +194,8 @@ const translations = {
     searchPlaceholder: 'Nach einem Skigebiet suchen...',
     nearbyResorts: 'Skigebiete in der Nähe',
     noResortsFound: 'Keine Skigebiete in der Nähe gefunden.',
-    searchingResorts: 'Suche nach Skigebieten...'
+    searchingResorts: 'Suche nach Skigebieten...',
+    locationRequired: 'Standort für die Suche in der Nähe erforderlich.'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -269,7 +271,8 @@ const translations = {
     searchPlaceholder: 'Buscar una estación...',
     nearbyResorts: 'Estaciones de Esquí Cercanas',
     noResortsFound: 'No se encontraron estaciones cercanas.',
-    searchingResorts: 'Buscando estaciones...'
+    searchingResorts: 'Buscando estaciones...',
+    locationRequired: 'Se requiere ubicación para búsqueda cercana.'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -355,7 +358,8 @@ const translations = {
     searchPlaceholder: 'Szukaj ośrodka...',
     nearbyResorts: 'Pobliskie Ośrodki Narciarskie',
     noResortsFound: 'Nie znaleziono ośrodków w pobliżu.',
-    searchingResorts: 'Szukanie ośrodków...'
+    searchingResorts: 'Szukanie ośrodków...',
+    locationRequired: 'Lokalizacja jest wymagana do wyszukiwania w pobliżu.'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -438,6 +442,13 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [resorts, setResorts] = useState<any[]>([]);
   const [isSearchingResorts, setIsSearchingResorts] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (showSearchPanel && resorts.length === 0 && currentPos && !isSearchingResorts) {
+      searchResorts();
+    }
+  }, [showSearchPanel, currentPos, resorts.length]);
   const [language, setLanguage] = useState<Language>('pl');
   const [showSettings, setShowSettings] = useState(false);
   const [altitudeOffset, setAltitudeOffset] = useState(0);
@@ -1146,8 +1157,13 @@ export default function App() {
 
   const searchResorts = async (query?: string) => {
     setIsSearchingResorts(true);
+    setSearchError(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("API Key missing");
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = query 
         ? `Find ski resorts matching "${query}"` 
         : "Find popular ski resorts near my location";
@@ -1173,20 +1189,30 @@ export default function App() {
         config
       });
 
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      if (chunks) {
+      const metadata = response.candidates?.[0]?.groundingMetadata;
+      const chunks = metadata?.groundingChunks;
+      
+      if (chunks && chunks.length > 0) {
         const foundResorts = chunks
-          .filter((c: any) => c.maps)
+          .filter((c: any) => c.maps || c.web)
           .map((c: any) => ({
-            title: c.maps.title,
-            uri: c.maps.uri
-          }));
-        setResorts(foundResorts);
-      } else {
-        setResorts([]);
+            title: c.maps?.title || c.web?.title || "Ski Resort",
+            uri: c.maps?.uri || c.web?.uri
+          }))
+          .filter((r: any) => r.uri);
+        
+        if (foundResorts.length > 0) {
+          setResorts(foundResorts);
+          return;
+        }
       }
-    } catch (error) {
+      
+      // Fallback: if no chunks but there is text, maybe we can't parse it as resorts
+      // but at least we know the model responded.
+      setResorts([]);
+    } catch (error: any) {
       console.error("Failed to search resorts:", error);
+      setSearchError(error.message || "Failed to find resorts");
       setResorts([]);
     } finally {
       setIsSearchingResorts(false);
@@ -1811,6 +1837,13 @@ export default function App() {
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                {!currentPos && !searchQuery && (
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-3 mb-2">
+                    <MapPin className="w-5 h-5 text-amber-500 shrink-0" />
+                    <p className="text-xs text-amber-200/80">{t.locationRequired}</p>
+                  </div>
+                )}
+                
                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">
                   {isSearchingResorts ? t.searchingResorts : t.nearbyResorts}
                 </h3>
@@ -1819,6 +1852,17 @@ export default function App() {
                   <div className="flex flex-col items-center justify-center py-12 gap-4">
                     <div className="w-8 h-8 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
                     <span className="text-zinc-500 text-sm">{t.searchingResorts}</span>
+                  </div>
+                ) : searchError ? (
+                  <div className="text-center py-12 text-red-400 bg-red-500/5 rounded-2xl border border-red-500/20 px-4">
+                    <p className="font-bold mb-1">Error</p>
+                    <p className="text-sm opacity-80">{searchError}</p>
+                    <button 
+                      onClick={() => searchResorts(searchQuery)}
+                      className="mt-4 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-bold"
+                    >
+                      Retry
+                    </button>
                   </div>
                 ) : resorts.length > 0 ? (
                   resorts.map((resort, idx) => (
