@@ -423,7 +423,50 @@ export default function App() {
   const [activeStatsPage, setActiveStatsPage] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
-  
+  const [tooltipPos, setTooltipPos] = useState<{ top?: number, left?: number, bottom?: number, right?: number, arrow?: 'top' | 'bottom' | 'left' | 'right' | 'center' }>({ arrow: 'center' });
+
+  // Tutorial positioning logic
+  useEffect(() => {
+    if (!showTutorial) return;
+
+    const targets = [
+      null, // Welcome
+      'tutorial-tracking',
+      'tutorial-stats',
+      'tutorial-map',
+      'tutorial-rooms',
+      'tutorial-settings'
+    ];
+
+    const targetId = targets[tutorialStep];
+    if (!targetId) {
+      setTooltipPos({ arrow: 'center' });
+      return;
+    }
+
+    const updatePos = () => {
+      const el = document.getElementById(targetId);
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const padding = 12;
+
+      if (targetId === 'tutorial-stats') {
+        setTooltipPos({ top: rect.bottom + padding, left: window.innerWidth / 2, arrow: 'top' });
+      } else if (targetId === 'tutorial-tracking') {
+        setTooltipPos({ bottom: (window.innerHeight - rect.top) + padding, left: window.innerWidth / 2, arrow: 'bottom' });
+      } else if (targetId === 'tutorial-rooms' || targetId === 'tutorial-settings') {
+        setTooltipPos({ bottom: (window.innerHeight - rect.top) - rect.height / 2, right: (window.innerWidth - rect.left) + padding, arrow: 'right' });
+      } else if (targetId === 'tutorial-map') {
+        setTooltipPos({ top: window.innerHeight / 2, left: window.innerWidth / 2, arrow: 'center' });
+      }
+    };
+
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    return () => window.removeEventListener('resize', updatePos);
+  }, [showTutorial, tutorialStep]);
+
   const socketRef = useRef<Socket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -1152,7 +1195,7 @@ export default function App() {
         )}
 
         {/* Map Container */}
-        <div className="absolute inset-0 z-0">
+        <div id="tutorial-map" className="absolute inset-0 z-0">
           {currentPos && (
             <MapContainer 
               center={currentPos} 
@@ -1217,7 +1260,7 @@ export default function App() {
         </div>
 
         {/* Stats Overlay - Top */}
-        <div className="absolute top-3 left-0 right-0 z-10 px-2 group">
+        <div id="tutorial-stats" className="absolute top-3 left-0 right-0 z-10 px-2 group">
           <div 
             onScroll={handleStatsScroll}
             className="overflow-x-auto scrollbar-hide snap-x snap-mandatory flex gap-1 pb-1"
@@ -1314,6 +1357,7 @@ export default function App() {
         {/* Controls - Bottom */}
         <div className="absolute bottom-8 left-0 right-0 px-6 flex justify-center items-center gap-4 z-10">
           <motion.button
+            id="tutorial-tracking"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={toggleTracking}
@@ -1387,11 +1431,13 @@ export default function App() {
             />
           )}
           <IconButton 
+            id="tutorial-rooms"
             onClick={() => setShowRoomModal(true)}
             active={!!joinedRoom}
             icon={<Users className={`w-5 h-5 ${joinedRoom ? 'text-emerald-500' : 'text-zinc-400'}`} />} 
           />
           <IconButton 
+            id="tutorial-settings"
             onClick={() => setShowSettings(true)}
             icon={<SettingsIcon className="w-5 h-5" />} 
           />
@@ -1675,36 +1721,60 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+              className="absolute inset-0 z-[100] pointer-events-none"
             >
+              {/* Dim background except for target area? Maybe just a simple dim background for now */}
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-auto" onClick={() => setShowTutorial(false)} />
+              
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-2xl"
+                key={tutorialStep}
+                initial={{ scale: 0.9, opacity: 0, y: 10 }}
+                animate={{ 
+                  scale: 1, 
+                  opacity: 1, 
+                  top: tooltipPos.top,
+                  left: tooltipPos.left,
+                  bottom: tooltipPos.bottom,
+                  right: tooltipPos.right,
+                  x: tooltipPos.left !== undefined ? '-50%' : tooltipPos.right !== undefined ? 0 : 0,
+                  y: tooltipPos.top !== undefined || tooltipPos.bottom !== undefined ? 0 : '-50%',
+                  position: 'absolute'
+                }}
+                style={{
+                  top: tooltipPos.top ?? (tooltipPos.bottom === undefined ? '50%' : undefined),
+                  left: tooltipPos.left ?? (tooltipPos.right === undefined ? '50%' : undefined),
+                  transform: `translate(${tooltipPos.left !== undefined ? '-50%' : '0'}, ${tooltipPos.top !== undefined || tooltipPos.bottom !== undefined ? '0' : '-50%'})`
+                }}
+                className="w-[280px] bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl pointer-events-auto relative"
               >
-                <div className="flex justify-between items-start mb-4">
+                {/* Arrow */}
+                {tooltipPos.arrow === 'top' && <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-zinc-900 border-t border-l border-zinc-800 rotate-45" />}
+                {tooltipPos.arrow === 'bottom' && <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-zinc-900 border-b border-r border-zinc-800 rotate-45" />}
+                {tooltipPos.arrow === 'right' && <div className="absolute top-1/2 -right-2 -translate-y-1/2 w-4 h-4 bg-zinc-900 border-t border-r border-zinc-800 rotate-45" />}
+
+                <div className="flex justify-between items-start mb-3">
                   <div>
-                    <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest mb-1 block">
-                      Step {tutorialStep + 1} / {t.tutorialSteps.length}
+                    <span className="text-[9px] font-mono text-emerald-500 uppercase tracking-widest mb-0.5 block">
+                      {tutorialStep + 1} / {t.tutorialSteps.length}
                     </span>
-                    <h2 className="text-xl font-bold text-zinc-100">{t.tutorialSteps[tutorialStep].title}</h2>
+                    <h2 className="text-lg font-bold text-zinc-100">{t.tutorialSteps[tutorialStep].title}</h2>
                   </div>
                   <button 
                     onClick={() => setShowTutorial(false)}
                     className="p-1 hover:bg-zinc-800 rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5 text-zinc-500" />
+                    <X className="w-4 h-4 text-zinc-500" />
                   </button>
                 </div>
                 
-                <p className="text-zinc-400 leading-relaxed mb-8">
+                <p className="text-zinc-400 text-sm leading-relaxed mb-6">
                   {t.tutorialSteps[tutorialStep].content}
                 </p>
 
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <button
                     onClick={() => setShowTutorial(false)}
-                    className="flex-1 py-3 text-zinc-500 font-bold hover:text-zinc-300 transition-colors"
+                    className="flex-1 py-2 text-zinc-500 text-xs font-bold hover:text-zinc-300 transition-colors"
                   >
                     {t.skip}
                   </button>
@@ -1716,7 +1786,7 @@ export default function App() {
                         setShowTutorial(false);
                       }
                     }}
-                    className="flex-[2] py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20"
+                    className="flex-[1.5] py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20"
                   >
                     {tutorialStep < t.tutorialSteps.length - 1 ? t.next : t.finish}
                   </button>
@@ -1760,9 +1830,10 @@ function StatCard({ label, value, unit, icon }: { label: string, value: string, 
   );
 }
 
-function IconButton({ icon, onClick, active }: { icon: React.ReactNode, onClick?: () => void, active?: boolean }) {
+function IconButton({ icon, onClick, active, id }: { icon: React.ReactNode, onClick?: () => void, active?: boolean, id?: string }) {
   return (
     <button 
+      id={id}
       onClick={onClick}
       className={`p-3 backdrop-blur-xl border rounded-xl transition-all shadow-lg ${
         active 
