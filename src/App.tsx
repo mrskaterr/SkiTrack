@@ -440,7 +440,7 @@ export default function App() {
 
     const targetId = targets[tutorialStep];
     if (!targetId) {
-      setTooltipPos({ arrow: 'center' });
+      setTooltipPos({ top: window.innerHeight / 2, left: window.innerWidth / 2, arrow: 'center' });
       return;
     }
 
@@ -450,13 +450,15 @@ export default function App() {
 
       const rect = el.getBoundingClientRect();
       const padding = 12;
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
 
       if (targetId === 'tutorial-stats') {
-        setTooltipPos({ top: rect.bottom + padding, left: window.innerWidth / 2, arrow: 'top' });
+        setTooltipPos({ top: rect.bottom + padding, left: centerX, arrow: 'top' });
       } else if (targetId === 'tutorial-tracking') {
-        setTooltipPos({ bottom: (window.innerHeight - rect.top) + padding, left: window.innerWidth / 2, arrow: 'bottom' });
+        setTooltipPos({ bottom: (window.innerHeight - rect.top) + padding, left: centerX, arrow: 'bottom' });
       } else if (targetId === 'tutorial-rooms' || targetId === 'tutorial-settings') {
-        setTooltipPos({ bottom: (window.innerHeight - rect.top) - rect.height / 2, right: (window.innerWidth - rect.left) + padding, arrow: 'right' });
+        setTooltipPos({ top: centerY, right: (window.innerWidth - rect.left) + padding, arrow: 'right' });
       } else if (targetId === 'tutorial-map') {
         setTooltipPos({ top: window.innerHeight / 2, left: window.innerWidth / 2, arrow: 'center' });
       }
@@ -1736,14 +1738,15 @@ export default function App() {
                   left: tooltipPos.left,
                   bottom: tooltipPos.bottom,
                   right: tooltipPos.right,
-                  x: tooltipPos.left !== undefined ? '-50%' : tooltipPos.right !== undefined ? 0 : 0,
-                  y: tooltipPos.top !== undefined || tooltipPos.bottom !== undefined ? 0 : '-50%',
+                  x: (tooltipPos.arrow === 'right' || tooltipPos.arrow === 'left') ? 0 : '-50%',
+                  y: (tooltipPos.arrow === 'top' || tooltipPos.arrow === 'bottom') ? 0 : '-50%',
                   position: 'absolute'
                 }}
                 style={{
-                  top: tooltipPos.top ?? (tooltipPos.bottom === undefined ? '50%' : undefined),
-                  left: tooltipPos.left ?? (tooltipPos.right === undefined ? '50%' : undefined),
-                  transform: `translate(${tooltipPos.left !== undefined ? '-50%' : '0'}, ${tooltipPos.top !== undefined || tooltipPos.bottom !== undefined ? '0' : '-50%'})`
+                  top: tooltipPos.top,
+                  left: tooltipPos.left,
+                  bottom: tooltipPos.bottom,
+                  right: tooltipPos.right,
                 }}
                 className="w-[280px] bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl pointer-events-auto relative"
               >
