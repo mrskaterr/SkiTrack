@@ -1775,7 +1775,16 @@ export default function App() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] pointer-events-none"
           >
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-auto" onClick={() => setShowTutorial(false)} />
+            <motion.div 
+              className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-auto" 
+              onClick={() => setShowTutorial(false)}
+              animate={{
+                clipPath: highlightRect 
+                  ? `polygon(0% 0%, 0% 100%, ${highlightRect.left - 4}px 100%, ${highlightRect.left - 4}px ${highlightRect.top - 4}px, ${highlightRect.left + highlightRect.width + 4}px ${highlightRect.top - 4}px, ${highlightRect.left + highlightRect.width + 4}px ${highlightRect.top + highlightRect.height + 4}px, ${highlightRect.left - 4}px ${highlightRect.top + highlightRect.height + 4}px, ${highlightRect.left - 4}px 100%, 100% 100%, 100% 0%)`
+                  : 'polygon(0% 0%, 0% 100%, 100% 100%, 100% 0%)'
+              }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            />
             
             {/* Spotlight Highlight */}
             <AnimatePresence>
