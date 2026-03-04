@@ -127,7 +127,8 @@ const translations = {
     nearbyResorts: 'Nearby Ski Resorts',
     noResortsFound: 'No resorts found nearby.',
     searchingResorts: 'Searching for resorts...',
-    locationRequired: 'Location required for nearby search.'
+    locationRequired: 'Location required for nearby search.',
+    featuredResorts: 'Featured Resorts'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -204,7 +205,8 @@ const translations = {
     nearbyResorts: 'Skigebiete in der Nähe',
     noResortsFound: 'Keine Skigebiete in der Nähe gefunden.',
     searchingResorts: 'Suche nach Skigebieten...',
-    locationRequired: 'Standort für die Suche in der Nähe erforderlich.'
+    locationRequired: 'Standort für die Suche in der Nähe erforderlich.',
+    featuredResorts: 'Empfohlene Skigebiete'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -281,7 +283,8 @@ const translations = {
     nearbyResorts: 'Estaciones de Esquí Cercanas',
     noResortsFound: 'No se encontraron estaciones cercanas.',
     searchingResorts: 'Buscando estaciones...',
-    locationRequired: 'Se requiere ubicación para búsqueda cercana.'
+    locationRequired: 'Se requiere ubicación para búsqueda cercana.',
+    featuredResorts: 'Estaciones Destacadas'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -368,7 +371,8 @@ const translations = {
     nearbyResorts: 'Pobliskie Ośrodki Narciarskie',
     noResortsFound: 'Nie znaleziono ośrodków w pobliżu.',
     searchingResorts: 'Szukanie ośrodków...',
-    locationRequired: 'Lokalizacja jest wymagana do wyszukiwania w pobliżu.'
+    locationRequired: 'Lokalizacja jest wymagana do wyszukiwania w pobliżu.',
+    featuredResorts: 'Polecane Ośrodki'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -384,6 +388,18 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
+
+const FEATURED_RESORTS = [
+  { title: 'Zermatt, Switzerland', uri: 'https://www.google.com/maps/search/Zermatt+Ski+Resort' },
+  { title: 'Chamonix, France', uri: 'https://www.google.com/maps/search/Chamonix+Ski+Resort' },
+  { title: 'Aspen Snowmass, USA', uri: 'https://www.google.com/maps/search/Aspen+Snowmass' },
+  { title: 'Whistler Blackcomb, Canada', uri: 'https://www.google.com/maps/search/Whistler+Blackcomb' },
+  { title: 'Cortina d\'Ampezzo, Italy', uri: 'https://www.google.com/maps/search/Cortina+d\'Ampezzo' },
+  { title: 'Niseko United, Japan', uri: 'https://www.google.com/maps/search/Niseko+United' },
+  { title: 'St. Anton am Arlberg, Austria', uri: 'https://www.google.com/maps/search/St.+Anton+am+Arlberg' },
+  { title: 'Zakopane, Poland', uri: 'https://www.google.com/maps/search/Zakopane+Ski' },
+  { title: 'Białka Tatrzańska, Poland', uri: 'https://www.google.com/maps/search/Białka+Tatrzańska+Kotelnica' }
+];
 
 // Helper to calculate distance between two points (Haversine formula)
 const calculateDistance = (p1: { lat: number, lng: number }, p2: { lat: number, lng: number }) => {
@@ -1232,7 +1248,11 @@ export default function App() {
       setResorts([]);
     } catch (error: any) {
       console.error("Failed to search resorts:", error);
-      if (error.message?.includes("Requested entity was not found") || error.message?.includes("API Key missing")) {
+      const isKeyError = error.message?.includes("API Key") || 
+                         error.message?.includes("klucza API") || 
+                         error.message?.includes("Requested entity was not found");
+      
+      if (isKeyError) {
         setHasApiKey(false);
       }
       setSearchError(error.message || "Failed to find resorts");
@@ -1868,7 +1888,7 @@ export default function App() {
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                {!currentPos && !searchQuery && (
+                {!currentPos && !searchQuery && !isSearchingResorts && !searchError && (
                   <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-3 mb-2">
                     <MapPin className="w-5 h-5 text-amber-500 shrink-0" />
                     <p className="text-xs text-amber-200/80">{t.locationRequired}</p>
@@ -1876,7 +1896,7 @@ export default function App() {
                 )}
                 
                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">
-                  {isSearchingResorts ? t.searchingResorts : t.nearbyResorts}
+                  {isSearchingResorts ? t.searchingResorts : (resorts.length === 0 && !searchQuery ? t.featuredResorts : t.nearbyResorts)}
                 </h3>
                 
                 {isSearchingResorts ? (
@@ -1884,30 +1904,46 @@ export default function App() {
                     <div className="w-8 h-8 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
                     <span className="text-zinc-500 text-sm">{t.searchingResorts}</span>
                   </div>
-                ) : !hasApiKey ? (
-                  <div className="text-center py-12 text-zinc-400 bg-zinc-900/50 rounded-2xl border border-zinc-800 px-6">
-                    <p className="font-bold mb-2 text-zinc-200">
-                      {language === 'pl' ? "Wymagany Klucz API" : "API Key Required"}
-                    </p>
-                    <p className="text-sm opacity-80 mb-6">
-                      {language === 'pl' 
-                        ? "Aby korzystać z wyszukiwarki ośrodków, musisz wybrać klucz API Gemini." 
-                        : "To use the resort search, you need to select a Gemini API key."}
-                    </p>
-                    <button 
-                      onClick={handleSelectKey}
-                      className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-400 transition-colors"
-                    >
-                      {language === 'pl' ? "Wybierz Klucz API" : "Select API Key"}
-                    </button>
-                    <a 
-                      href="https://ai.google.dev/gemini-api/docs/billing" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="block mt-4 text-xs text-zinc-500 underline"
-                    >
-                      {language === 'pl' ? "Dokumentacja bilingowa" : "Billing documentation"}
-                    </a>
+                ) : !hasApiKey && resorts.length === 0 ? (
+                  <div className="space-y-4">
+                    <div className="text-center py-6 text-zinc-400 bg-zinc-900/50 rounded-2xl border border-zinc-800 px-6">
+                      <p className="font-bold mb-2 text-zinc-200">
+                        {language === 'pl' ? "Wymagany Klucz API" : "API Key Required"}
+                      </p>
+                      <p className="text-sm opacity-80 mb-4">
+                        {language === 'pl' 
+                          ? "Wyszukiwanie dynamiczne wymaga klucza API, ale poniżej znajdziesz polecane ośrodki." 
+                          : "Dynamic search requires an API key, but you can find featured resorts below."}
+                      </p>
+                      <button 
+                        onClick={handleSelectKey}
+                        className="w-full py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-400 transition-colors text-sm"
+                      >
+                        {language === 'pl' ? "Wybierz Klucz API" : "Select API Key"}
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {FEATURED_RESORTS.map((resort, idx) => (
+                        <motion.a
+                          key={`featured-${idx}`}
+                          href={resort.uri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-2xl hover:border-emerald-500/50 transition-all group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-zinc-800 rounded-lg group-hover:bg-emerald-500/10 transition-colors">
+                              <MapPin className="w-5 h-5 text-zinc-400 group-hover:text-emerald-500" />
+                            </div>
+                            <span className="font-bold text-zinc-200 group-hover:text-white transition-colors">
+                              {resort.title}
+                            </span>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-zinc-600 group-hover:text-emerald-500 transition-colors" />
+                        </motion.a>
+                      ))}
+                    </div>
                   </div>
                 ) : searchError ? (
                   <div className="text-center py-12 text-red-400 bg-red-500/5 rounded-2xl border border-red-500/20 px-4">
