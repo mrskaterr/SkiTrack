@@ -424,6 +424,7 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tooltipPos, setTooltipPos] = useState<{ top?: number, left?: number, bottom?: number, right?: number, arrow?: 'top' | 'bottom' | 'left' | 'right' | 'center' }>({ arrow: 'center' });
+  const [highlightRect, setHighlightRect] = useState<{ top: number, left: number, width: number, height: number } | null>(null);
 
   // Tutorial positioning logic
   useEffect(() => {
@@ -441,14 +442,23 @@ export default function App() {
     const targetId = targets[tutorialStep];
     if (!targetId) {
       setTooltipPos({ top: window.innerHeight / 2, left: window.innerWidth / 2, arrow: 'center' });
+      setHighlightRect(null);
       return;
     }
 
     const updatePos = () => {
       const el = document.getElementById(targetId);
-      if (!el) return;
+      if (!el) {
+        setHighlightRect(null);
+        return;
+      }
 
       const rect = el.getBoundingClientRect();
+      if (targetId === 'tutorial-map') {
+        setHighlightRect(null);
+      } else {
+        setHighlightRect({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
+      }
       const padding = 16;
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
@@ -1749,9 +1759,27 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="absolute inset-0 z-[100] pointer-events-none"
             >
-              {/* Dim background except for target area? Maybe just a simple dim background for now */}
               <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-auto" onClick={() => setShowTutorial(false)} />
               
+              {/* Spotlight Highlight */}
+              <AnimatePresence>
+                {highlightRect && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ 
+                      opacity: 1, 
+                      scale: 1,
+                      top: highlightRect.top - 4,
+                      left: highlightRect.left - 4,
+                      width: highlightRect.width + 8,
+                      height: highlightRect.height + 8,
+                    }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="absolute border-2 border-emerald-500 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.6)] z-[101] pointer-events-none bg-emerald-500/5"
+                  />
+                )}
+              </AnimatePresence>
+
               <motion.div
                 key={tutorialStep}
                 initial={{ scale: 0.9, opacity: 0, y: 10 }}
