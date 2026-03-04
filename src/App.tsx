@@ -449,18 +449,42 @@ export default function App() {
       if (!el) return;
 
       const rect = el.getBoundingClientRect();
-      const padding = 12;
+      const padding = 16;
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
 
       if (targetId === 'tutorial-stats') {
-        setTooltipPos({ top: rect.bottom + padding, left: centerX, arrow: 'top' });
+        setTooltipPos({ 
+          top: rect.bottom + padding, 
+          left: centerX, 
+          bottom: undefined, 
+          right: undefined, 
+          arrow: 'top' 
+        });
       } else if (targetId === 'tutorial-tracking') {
-        setTooltipPos({ bottom: (window.innerHeight - rect.top) + padding, left: centerX, arrow: 'bottom' });
+        setTooltipPos({ 
+          top: undefined, 
+          left: centerX, 
+          bottom: (window.innerHeight - rect.top) + padding, 
+          right: undefined, 
+          arrow: 'bottom' 
+        });
       } else if (targetId === 'tutorial-rooms' || targetId === 'tutorial-settings') {
-        setTooltipPos({ top: centerY, right: (window.innerWidth - rect.left) + padding, arrow: 'right' });
+        setTooltipPos({ 
+          top: centerY, 
+          left: undefined, 
+          bottom: undefined, 
+          right: (window.innerWidth - rect.left) + padding, 
+          arrow: 'right' 
+        });
       } else if (targetId === 'tutorial-map') {
-        setTooltipPos({ top: window.innerHeight / 2, left: window.innerWidth / 2, arrow: 'center' });
+        setTooltipPos({ 
+          top: window.innerHeight / 2, 
+          left: window.innerWidth / 2, 
+          bottom: undefined, 
+          right: undefined, 
+          arrow: 'center' 
+        });
       }
     };
 
@@ -1734,21 +1758,16 @@ export default function App() {
                 animate={{ 
                   scale: 1, 
                   opacity: 1, 
-                  top: tooltipPos.top,
-                  left: tooltipPos.left,
-                  bottom: tooltipPos.bottom,
-                  right: tooltipPos.right,
+                  top: tooltipPos.top ?? 'auto',
+                  left: tooltipPos.left ?? 'auto',
+                  bottom: tooltipPos.bottom ?? 'auto',
+                  right: tooltipPos.right ?? 'auto',
                   x: (tooltipPos.arrow === 'right' || tooltipPos.arrow === 'left') ? 0 : '-50%',
                   y: (tooltipPos.arrow === 'top' || tooltipPos.arrow === 'bottom') ? 0 : '-50%',
                   position: 'absolute'
                 }}
-                style={{
-                  top: tooltipPos.top,
-                  left: tooltipPos.left,
-                  bottom: tooltipPos.bottom,
-                  right: tooltipPos.right,
-                }}
-                className="w-[280px] bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl pointer-events-auto relative"
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="w-[280px] max-w-[calc(100vw-32px)] bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl pointer-events-auto relative"
               >
                 {/* Arrow */}
                 {tooltipPos.arrow === 'top' && <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-zinc-900 border-t border-l border-zinc-800 rotate-45" />}
