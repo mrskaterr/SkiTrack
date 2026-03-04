@@ -30,6 +30,15 @@ import {
 import { io, Socket } from 'socket.io-client';
 import { GoogleGenAI } from "@google/genai";
 
+declare global {
+  interface Window {
+    aistudio?: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
+
 type Language = 'en' | 'de' | 'es' | 'pl';
 
 const translations = {
@@ -443,12 +452,23 @@ export default function App() {
   const [resorts, setResorts] = useState<any[]>([]);
   const [isSearchingResorts, setIsSearchingResorts] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(true);
 
   useEffect(() => {
-    if (showSearchPanel && resorts.length === 0 && currentPos && !isSearchingResorts) {
+    const checkKey = async () => {
+      if (window.aistudio?.hasSelectedApiKey) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(hasKey);
+      }
+    };
+    checkKey();
+  }, [showSearchPanel]);
+
+  useEffect(() => {
+    if (showSearchPanel && resorts.length === 0 && currentPos && !isSearchingResorts && hasApiKey) {
       searchResorts();
     }
-  }, [showSearchPanel, currentPos, resorts.length]);
+  }, [showSearchPanel, currentPos, resorts.length, hasApiKey]);
   const [language, setLanguage] = useState<Language>('pl');
   const [showSettings, setShowSettings] = useState(false);
   const [altitudeOffset, setAltitudeOffset] = useState(0);
@@ -1159,9 +1179,9 @@ export default function App() {
     setIsSearchingResorts(true);
     setSearchError(null);
     try {
-      const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error("API Key missing");
+        throw new Error(language === 'pl' ? "Brak klucza API Gemini. Sprawdź konfigurację platformy." : "Gemini API Key missing. Check platform configuration.");
       }
       const ai = new GoogleGenAI({ apiKey });
       const prompt = query 
@@ -1212,10 +1232,21 @@ export default function App() {
       setResorts([]);
     } catch (error: any) {
       console.error("Failed to search resorts:", error);
+      if (error.message?.includes("Requested entity was not found") || error.message?.includes("API Key missing")) {
+        setHasApiKey(false);
+      }
       setSearchError(error.message || "Failed to find resorts");
       setResorts([]);
     } finally {
       setIsSearchingResorts(false);
+    }
+  };
+
+  const handleSelectKey = async () => {
+    if (window.aistudio?.openSelectKey) {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true);
+      searchResorts(searchQuery);
     }
   };
 
@@ -1852,6 +1883,31 @@ export default function App() {
                   <div className="flex flex-col items-center justify-center py-12 gap-4">
                     <div className="w-8 h-8 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
                     <span className="text-zinc-500 text-sm">{t.searchingResorts}</span>
+                  </div>
+                ) : !hasApiKey ? (
+                  <div className="text-center py-12 text-zinc-400 bg-zinc-900/50 rounded-2xl border border-zinc-800 px-6">
+                    <p className="font-bold mb-2 text-zinc-200">
+                      {language === 'pl' ? "Wymagany Klucz API" : "API Key Required"}
+                    </p>
+                    <p className="text-sm opacity-80 mb-6">
+                      {language === 'pl' 
+                        ? "Aby korzystać z wyszukiwarki ośrodków, musisz wybrać klucz API Gemini." 
+                        : "To use the resort search, you need to select a Gemini API key."}
+                    </p>
+                    <button 
+                      onClick={handleSelectKey}
+                      className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-400 transition-colors"
+                    >
+                      {language === 'pl' ? "Wybierz Klucz API" : "Select API Key"}
+                    </button>
+                    <a 
+                      href="https://ai.google.dev/gemini-api/docs/billing" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block mt-4 text-xs text-zinc-500 underline"
+                    >
+                      {language === 'pl' ? "Dokumentacja bilingowa" : "Billing documentation"}
+                    </a>
                   </div>
                 ) : searchError ? (
                   <div className="text-center py-12 text-red-400 bg-red-500/5 rounded-2xl border border-red-500/20 px-4">
