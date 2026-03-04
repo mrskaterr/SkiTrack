@@ -95,7 +95,18 @@ const translations = {
     openInBrowser: 'Open in Browser',
     falls8g: 'Falls 8g',
     falls5g: 'Falls 5g',
-    fallDetected: 'Fall Detected!'
+    startTutorial: 'Start Tutorial',
+    tutorialSteps: [
+      { title: 'Welcome', content: 'Welcome to the Ski Tracker! Let us show you around.' },
+      { title: 'Tracking', content: 'Click the Play button to start tracking your session.' },
+      { title: 'Stats', content: 'Swipe through the stats cards to see your speed, altitude, and more.' },
+      { title: 'Map', content: 'See your real-time position and route on the map.' },
+      { title: 'Rooms', content: 'Join or create a room to see your friends on the map and talk to them.' },
+      { title: 'Settings', content: 'Change language and other options here.' }
+    ],
+    next: 'Next',
+    finish: 'Finish',
+    skip: 'Skip'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -153,7 +164,18 @@ const translations = {
     minSlope: 'Min. Gefälle',
     falls8g: 'Stürze 8g',
     falls5g: 'Stürze 5g',
-    fallDetected: 'Sturz erkannt!'
+    startTutorial: 'Tutorial starten',
+    tutorialSteps: [
+      { title: 'Willkommen', content: 'Willkommen beim Ski Tracker! Lassen Sie sich von uns herumführen.' },
+      { title: 'Tracking', content: 'Klicken Sie auf die Play-Schaltfläche, um Ihre Sitzung zu starten.' },
+      { title: 'Statistiken', content: 'Wischen Sie durch die Statistik-Karten, um Geschwindigkeit, Höhe i.v.m. zu sehen.' },
+      { title: 'Karte', content: 'Sehen Sie Ihre Echtzeit-Position und Route auf der Karte.' },
+      { title: 'Räume', content: 'Treten Sie einem Raum bei oder erstellen Sie einen, um Ihre Freunde auf der Karte zu sehen und mit ihnen zu sprechen.' },
+      { title: 'Einstellungen', content: 'Ändern Sie hier die Sprache und andere Optionen.' }
+    ],
+    next: 'Weiter',
+    finish: 'Beenden',
+    skip: 'Überspringen'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -211,7 +233,18 @@ const translations = {
     minSlope: 'Pendiente Mín.',
     falls8g: 'Caídas 8g',
     falls5g: 'Caídas 5g',
-    fallDetected: '¡Caída detectada!'
+    startTutorial: 'Iniciar Tutorial',
+    tutorialSteps: [
+      { title: 'Bienvenido', content: '¡Bienvenido al Ski Tracker! Permítenos mostrarte los alrededores.' },
+      { title: 'Seguimiento', content: 'Haz clic en el botón Play para comenzar a rastrear tu sesión.' },
+      { title: 'Estadísticas', content: 'Desliza las tarjetas de estadísticas para ver tu velocidad, altitud y más.' },
+      { title: 'Mapa', content: 'Mira tu posición en tiempo real y tu ruta en el mapa.' },
+      { title: 'Salas', content: 'Únete o crea una sala para ver a tus amigos en el mapa y hablar con ellos.' },
+      { title: 'Ajustes', content: 'Cambia el idioma y otras opciones aquí.' }
+    ],
+    next: 'Siguiente',
+    finish: 'Finalizar',
+    skip: 'Omitir'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -279,7 +312,18 @@ const translations = {
     openInBrowser: 'Otwórz w przeglądarce',
     falls8g: 'Upadki 8g',
     falls5g: 'Upadki 5g',
-    fallDetected: 'Wykryto upadek!'
+    startTutorial: 'Uruchom Samouczek',
+    tutorialSteps: [
+      { title: 'Witaj', content: 'Witaj w Ski Tracker! Pozwól, że oprowadzimy Cię po aplikacji.' },
+      { title: 'Śledzenie', content: 'Kliknij przycisk Play, aby rozpocząć śledzenie swojej sesji.' },
+      { title: 'Statystyki', content: 'Przesuwaj karty statystyk, aby zobaczyć prędkość, wysokość i inne dane.' },
+      { title: 'Mapa', content: 'Zobacz swoją aktualną pozycję i trasę na mapie.' },
+      { title: 'Pokoje', content: 'Dołącz do pokoju lub stwórz własny, aby widzieć znajomych na mapie i rozmawiać z nimi.' },
+      { title: 'Ustawienia', content: 'Tutaj możesz zmienić język i inne opcje.' }
+    ],
+    next: 'Dalej',
+    finish: 'Zakończ',
+    skip: 'Pomiń'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -377,6 +421,8 @@ export default function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [activeStatsPage, setActiveStatsPage] = useState(0);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   
   const socketRef = useRef<Socket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -1591,6 +1637,24 @@ export default function App() {
                       ))}
                     </div>
                   </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 text-zinc-400 mb-4">
+                      <Activity className="w-4 h-4" />
+                      <span className="text-sm font-bold uppercase tracking-wider">{t.startTutorial}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowSettings(false);
+                        setShowTutorial(true);
+                        setTutorialStep(0);
+                      }}
+                      className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                    >
+                      <Play className="w-5 h-5 fill-current" />
+                      {t.startTutorial}
+                    </button>
+                  </div>
                 </div>
 
                 <button 
@@ -1600,6 +1664,64 @@ export default function App() {
                   {t.close}
                 </button>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tutorial Overlay */}
+        <AnimatePresence>
+          {showTutorial && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-2xl"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest mb-1 block">
+                      Step {tutorialStep + 1} / {t.tutorialSteps.length}
+                    </span>
+                    <h2 className="text-xl font-bold text-zinc-100">{t.tutorialSteps[tutorialStep].title}</h2>
+                  </div>
+                  <button 
+                    onClick={() => setShowTutorial(false)}
+                    className="p-1 hover:bg-zinc-800 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-zinc-500" />
+                  </button>
+                </div>
+                
+                <p className="text-zinc-400 leading-relaxed mb-8">
+                  {t.tutorialSteps[tutorialStep].content}
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowTutorial(false)}
+                    className="flex-1 py-3 text-zinc-500 font-bold hover:text-zinc-300 transition-colors"
+                  >
+                    {t.skip}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (tutorialStep < t.tutorialSteps.length - 1) {
+                        setTutorialStep(prev => prev + 1);
+                      } else {
+                        setShowTutorial(false);
+                      }
+                    }}
+                    className="flex-[2] py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20"
+                  >
+                    {tutorialStep < t.tutorialSteps.length - 1 ? t.next : t.finish}
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
