@@ -102,7 +102,8 @@ const translations = {
       { title: 'Stats', content: 'Swipe through the stats cards to see your speed, altitude, and more.' },
       { title: 'Map', content: 'See your real-time position and route on the map.' },
       { title: 'Rooms', content: 'Join or create a room to see your friends on the map and talk to them.' },
-      { title: 'Settings', content: 'Change language and other options here.' }
+      { title: 'Settings', content: 'Change language and other options here.' },
+      { title: 'Follow', content: 'Enable this to keep the map centered on your position.' }
     ],
     next: 'Next',
     finish: 'Finish',
@@ -171,7 +172,8 @@ const translations = {
       { title: 'Statistiken', content: 'Wischen Sie durch die Statistik-Karten, um Geschwindigkeit, Höhe i.v.m. zu sehen.' },
       { title: 'Karte', content: 'Sehen Sie Ihre Echtzeit-Position und Route auf der Karte.' },
       { title: 'Räume', content: 'Treten Sie einem Raum bei oder erstellen Sie einen, um Ihre Freunde auf der Karte zu sehen und mit ihnen zu sprechen.' },
-      { title: 'Einstellungen', content: 'Ändern Sie hier die Sprache und andere Optionen.' }
+      { title: 'Einstellungen', content: 'Ändern Sie hier die Sprache und andere Optionen.' },
+      { title: 'Folgen', content: 'Aktivieren Sie dies, damit die Karte auf Ihrer Position zentriert bleibt.' }
     ],
     next: 'Weiter',
     finish: 'Beenden',
@@ -240,7 +242,8 @@ const translations = {
       { title: 'Estadísticas', content: 'Desliza las tarjetas de estadísticas para ver tu velocidad, altitud y más.' },
       { title: 'Mapa', content: 'Mira tu posición en tiempo real y tu ruta en el mapa.' },
       { title: 'Salas', content: 'Únete o crea una sala para ver a tus amigos en el mapa y hablar con ellos.' },
-      { title: 'Ajustes', content: 'Cambia el idioma y otras opciones aquí.' }
+      { title: 'Ajustes', content: 'Cambia el idioma y otras opciones aquí.' },
+      { title: 'Seguir', content: 'Activa esto para mantener el mapa centrado en tu posición.' }
     ],
     next: 'Siguiente',
     finish: 'Finalizar',
@@ -319,7 +322,8 @@ const translations = {
       { title: 'Statystyki', content: 'Przesuwaj karty statystyk, aby zobaczyć prędkość, wysokość i inne dane.' },
       { title: 'Mapa', content: 'Zobacz swoją aktualną pozycję i trasę na mapie.' },
       { title: 'Pokoje', content: 'Dołącz do pokoju lub stwórz własny, aby widzieć znajomych na mapie i rozmawiać z nimi.' },
-      { title: 'Ustawienia', content: 'Tutaj możesz zmienić język i inne opcje.' }
+      { title: 'Ustawienia', content: 'Tutaj możesz zmienić język i inne opcje.' },
+      { title: 'Centrowanie', content: 'Włącz tę opcję, aby mapa automatycznie podążała za Twoją pozycją.' }
     ],
     next: 'Dalej',
     finish: 'Zakończ',
@@ -436,7 +440,8 @@ export default function App() {
       'tutorial-stats',
       'tutorial-map',
       'tutorial-rooms',
-      'tutorial-settings'
+      'tutorial-settings',
+      'tutorial-follow'
     ];
 
     const targetId = targets[tutorialStep];
@@ -479,7 +484,7 @@ export default function App() {
           right: undefined, 
           arrow: 'bottom' 
         });
-      } else if (targetId === 'tutorial-rooms' || targetId === 'tutorial-settings') {
+      } else if (targetId === 'tutorial-rooms' || targetId === 'tutorial-settings' || targetId === 'tutorial-follow') {
         setTooltipPos({ 
           top: centerY, 
           left: undefined, 
@@ -1478,6 +1483,7 @@ export default function App() {
             icon={<SettingsIcon className="w-5 h-5" />} 
           />
           <IconButton 
+            id="tutorial-follow"
             active={followUser}
             onClick={() => setFollowUser(!followUser)}
             icon={<Navigation className={`w-5 h-5 ${followUser ? 'text-emerald-500' : 'text-zinc-400'}`} />} 
