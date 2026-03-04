@@ -22,9 +22,13 @@ import {
   X,
   Users,
   Mic,
-  MicOff
+  MicOff,
+  Search,
+  MapPin,
+  ExternalLink
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
+import { GoogleGenAI } from "@google/genai";
 
 type Language = 'en' | 'de' | 'es' | 'pl';
 
@@ -102,12 +106,18 @@ const translations = {
       { title: 'Stats', content: 'Swipe through the stats cards to see your speed, altitude, and more.' },
       { title: 'Map', content: 'See your real-time position and route on the map.' },
       { title: 'Rooms', content: 'Join or create a room to see your friends on the map and talk to them.' },
+      { title: 'Search', content: 'Find ski resorts nearby or search for specific ones.' },
       { title: 'Settings', content: 'Change language and other options here.' },
       { title: 'Follow', content: 'Enable this to keep the map centered on your position.' }
     ],
     next: 'Next',
     finish: 'Finish',
-    skip: 'Skip'
+    skip: 'Skip',
+    searchResorts: 'Search Resorts',
+    searchPlaceholder: 'Search for a resort...',
+    nearbyResorts: 'Nearby Ski Resorts',
+    noResortsFound: 'No resorts found nearby.',
+    searchingResorts: 'Searching for resorts...'
   },
   de: {
     trackingActive: 'Tracking Aktiv',
@@ -172,12 +182,18 @@ const translations = {
       { title: 'Statistiken', content: 'Wischen Sie durch die Statistik-Karten, um Geschwindigkeit, Höhe i.v.m. zu sehen.' },
       { title: 'Karte', content: 'Sehen Sie Ihre Echtzeit-Position und Route auf der Karte.' },
       { title: 'Räume', content: 'Treten Sie einem Raum bei oder erstellen Sie einen, um Ihre Freunde auf der Karte zu sehen und mit ihnen zu sprechen.' },
+      { title: 'Suche', content: 'Finden Sie Skigebiete in der Nähe oder suchen Sie nach bestimmten Gebieten.' },
       { title: 'Einstellungen', content: 'Ändern Sie hier die Sprache und andere Optionen.' },
       { title: 'Folgen', content: 'Aktivieren Sie dies, damit die Karte auf Ihrer Position zentriert bleibt.' }
     ],
     next: 'Weiter',
     finish: 'Beenden',
-    skip: 'Überspringen'
+    skip: 'Überspringen',
+    searchResorts: 'Skigebiete suchen',
+    searchPlaceholder: 'Nach einem Skigebiet suchen...',
+    nearbyResorts: 'Skigebiete in der Nähe',
+    noResortsFound: 'Keine Skigebiete in der Nähe gefunden.',
+    searchingResorts: 'Suche nach Skigebieten...'
   },
   es: {
     trackingActive: 'Seguimiento Activo',
@@ -242,12 +258,18 @@ const translations = {
       { title: 'Estadísticas', content: 'Desliza las tarjetas de estadísticas para ver tu velocidad, altitud y más.' },
       { title: 'Mapa', content: 'Mira tu posición en tiempo real y tu ruta en el mapa.' },
       { title: 'Salas', content: 'Únete o crea una sala para ver a tus amigos en el mapa y hablar con ellos.' },
+      { title: 'Buscar', content: 'Encuentra estaciones de esquí cercanas o busca estaciones específicas.' },
       { title: 'Ajustes', content: 'Cambia el idioma y otras opciones aquí.' },
       { title: 'Seguir', content: 'Activa esto para mantener el mapa centrado en tu posición.' }
     ],
     next: 'Siguiente',
     finish: 'Finalizar',
-    skip: 'Omitir'
+    skip: 'Omitir',
+    searchResorts: 'Buscar Estaciones',
+    searchPlaceholder: 'Buscar una estación...',
+    nearbyResorts: 'Estaciones de Esquí Cercanas',
+    noResortsFound: 'No se encontraron estaciones cercanas.',
+    searchingResorts: 'Buscando estaciones...'
   },
   pl: {
     trackingActive: 'Śledzenie Aktywne',
@@ -322,12 +344,18 @@ const translations = {
       { title: 'Statystyki', content: 'Przesuwaj karty statystyk, aby zobaczyć prędkość, wysokość i inne dane.' },
       { title: 'Mapa', content: 'Zobacz swoją aktualną pozycję i trasę na mapie.' },
       { title: 'Pokoje', content: 'Dołącz do pokoju lub stwórz własny, aby widzieć znajomych na mapie i rozmawiać z nimi.' },
+      { title: 'Szukaj', content: 'Znajdź ośrodki narciarskie w pobliżu lub wyszukaj konkretne miejsca.' },
       { title: 'Ustawienia', content: 'Tutaj możesz zmienić język i inne opcje.' },
       { title: 'Centrowanie', content: 'Włącz tę opcję, aby mapa automatycznie podążała za Twoją pozycją.' }
     ],
     next: 'Dalej',
     finish: 'Zakończ',
-    skip: 'Pomiń'
+    skip: 'Pomiń',
+    searchResorts: 'Szukaj Ośrodków',
+    searchPlaceholder: 'Szukaj ośrodka...',
+    nearbyResorts: 'Pobliskie Ośrodki Narciarskie',
+    noResortsFound: 'Nie znaleziono ośrodków w pobliżu.',
+    searchingResorts: 'Szukanie ośrodków...'
   }
 };
 import { motion, AnimatePresence } from 'motion/react';
@@ -406,6 +434,10 @@ export default function App() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [appIcon, setAppIcon] = useState<string | null>(null);
   const [isGeneratingIcon, setIsGeneratingIcon] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [resorts, setResorts] = useState<any[]>([]);
+  const [isSearchingResorts, setIsSearchingResorts] = useState(false);
   const [language, setLanguage] = useState<Language>('pl');
   const [showSettings, setShowSettings] = useState(false);
   const [altitudeOffset, setAltitudeOffset] = useState(0);
@@ -440,6 +472,7 @@ export default function App() {
       'tutorial-stats',
       'tutorial-map',
       'tutorial-rooms',
+      'tutorial-search',
       'tutorial-settings',
       'tutorial-follow'
     ];
@@ -484,7 +517,7 @@ export default function App() {
           right: undefined, 
           arrow: 'bottom' 
         });
-      } else if (targetId === 'tutorial-rooms' || targetId === 'tutorial-settings' || targetId === 'tutorial-follow') {
+      } else if (targetId === 'tutorial-rooms' || targetId === 'tutorial-settings' || targetId === 'tutorial-follow' || targetId === 'tutorial-search') {
         setTooltipPos({ 
           top: centerY, 
           left: undefined, 
@@ -1111,6 +1144,55 @@ export default function App() {
     }
   };
 
+  const searchResorts = async (query?: string) => {
+    setIsSearchingResorts(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = query 
+        ? `Find ski resorts matching "${query}"` 
+        : "Find popular ski resorts near my location";
+      
+      const config: any = {
+        tools: [{ googleMaps: {} }]
+      };
+
+      if (currentPos) {
+        config.toolConfig = {
+          retrievalConfig: {
+            latLng: {
+              latitude: currentPos[0],
+              longitude: currentPos[1]
+            }
+          }
+        };
+      }
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config
+      });
+
+      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      if (chunks) {
+        const foundResorts = chunks
+          .filter((c: any) => c.maps)
+          .map((c: any) => ({
+            title: c.maps.title,
+            uri: c.maps.uri
+          }));
+        setResorts(foundResorts);
+      } else {
+        setResorts([]);
+      }
+    } catch (error) {
+      console.error("Failed to search resorts:", error);
+      setResorts([]);
+    } finally {
+      setIsSearchingResorts(false);
+    }
+  };
+
   const centerMap = () => {
     if (currentPos) {
       setFollowUser(true);
@@ -1472,6 +1554,14 @@ export default function App() {
             />
           )}
           <IconButton 
+            id="tutorial-search"
+            onClick={() => {
+              setShowSearchPanel(true);
+              if (resorts.length === 0) searchResorts();
+            }}
+            icon={<Search className="w-5 h-5 text-zinc-400" />} 
+          />
+          <IconButton 
             id="tutorial-rooms"
             onClick={() => setShowRoomModal(true)}
             active={!!joinedRoom}
@@ -1673,6 +1763,91 @@ export default function App() {
                 >
                   {t.close}
                 </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Search Resorts Modal */}
+        <AnimatePresence>
+          {showSearchPanel && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[85] bg-zinc-950/95 backdrop-blur-xl flex flex-col p-6"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/10 rounded-lg">
+                    <Search className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  <h2 className="text-xl font-bold text-zinc-100">{t.searchResorts}</h2>
+                </div>
+                <button 
+                  onClick={() => setShowSearchPanel(false)}
+                  className="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6 text-zinc-500" />
+                </button>
+              </div>
+
+              <div className="relative mb-6">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchResorts(searchQuery)}
+                  placeholder={t.searchPlaceholder}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
+                <button
+                  onClick={() => searchResorts(searchQuery)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-400 transition-colors"
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">
+                  {isSearchingResorts ? t.searchingResorts : t.nearbyResorts}
+                </h3>
+                
+                {isSearchingResorts ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <div className="w-8 h-8 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+                    <span className="text-zinc-500 text-sm">{t.searchingResorts}</span>
+                  </div>
+                ) : resorts.length > 0 ? (
+                  resorts.map((resort, idx) => (
+                    <motion.a
+                      key={idx}
+                      href={resort.uri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-2xl hover:border-emerald-500/50 transition-all group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-zinc-800 rounded-lg group-hover:bg-emerald-500/10 transition-colors">
+                          <MapPin className="w-5 h-5 text-zinc-400 group-hover:text-emerald-500" />
+                        </div>
+                        <span className="font-bold text-zinc-200 group-hover:text-white transition-colors">
+                          {resort.title}
+                        </span>
+                      </div>
+                      <ExternalLink className="w-4 h-4 text-zinc-600 group-hover:text-emerald-500 transition-colors" />
+                    </motion.a>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-zinc-600">
+                    {t.noResortsFound}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
