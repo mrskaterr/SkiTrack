@@ -367,7 +367,7 @@ const translations = {
     finish: 'Zakończ',
     skip: 'Pomiń',
     searchResorts: 'Szukaj Ośrodków',
-    searchPlaceholder: 'Szukaj ośrodka...',
+    searchPlaceholder: 'Szukaj miejscowości lub ośrodka...',
     nearbyResorts: 'Pobliskie Ośrodki Narciarskie',
     noResortsFound: 'Nie znaleziono ośrodków w pobliżu.',
     searchingResorts: 'Szukanie ośrodków...',
@@ -398,7 +398,12 @@ const FEATURED_RESORTS = [
   { title: 'Niseko United, Japan', uri: 'https://www.google.com/maps/search/Niseko+United' },
   { title: 'St. Anton am Arlberg, Austria', uri: 'https://www.google.com/maps/search/St.+Anton+am+Arlberg' },
   { title: 'Zakopane, Poland', uri: 'https://www.google.com/maps/search/Zakopane+Ski' },
-  { title: 'Białka Tatrzańska, Poland', uri: 'https://www.google.com/maps/search/Białka+Tatrzańska+Kotelnica' }
+  { title: 'Białka Tatrzańska, Poland', uri: 'https://www.google.com/maps/search/Białka+Tatrzańska+Kotelnica' },
+  { title: 'Szczyrk, Poland', uri: 'https://www.google.com/maps/search/Szczyrk+Mountain+Resort' },
+  { title: 'Karpacz, Poland', uri: 'https://www.google.com/maps/search/Karpacz+Ski' },
+  { title: 'Zieleniec, Poland', uri: 'https://www.google.com/maps/search/Zieleniec+Ski+Arena' },
+  { title: 'Wisła, Poland', uri: 'https://www.google.com/maps/search/Wisła+Ski' },
+  { title: 'Krynica-Zdrój, Poland', uri: 'https://www.google.com/maps/search/Krynica+Zdrój+Ski' }
 ];
 
 // Helper to calculate distance between two points (Haversine formula)
@@ -1197,7 +1202,9 @@ export default function App() {
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error(language === 'pl' ? "Brak klucza API Gemini. Sprawdź konfigurację platformy." : "Gemini API Key missing. Check platform configuration.");
+        setHasApiKey(false);
+        setIsSearchingResorts(false);
+        return;
       }
       const ai = new GoogleGenAI({ apiKey });
       const prompt = query 
@@ -1904,7 +1911,7 @@ export default function App() {
                     <div className="w-8 h-8 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
                     <span className="text-zinc-500 text-sm">{t.searchingResorts}</span>
                   </div>
-                ) : !hasApiKey && resorts.length === 0 ? (
+                ) : !hasApiKey ? (
                   <div className="space-y-4">
                     <div className="text-center py-6 text-zinc-400 bg-zinc-900/50 rounded-2xl border border-zinc-800 px-6">
                       <p className="font-bold mb-2 text-zinc-200">
@@ -1912,8 +1919,8 @@ export default function App() {
                       </p>
                       <p className="text-sm opacity-80 mb-4">
                         {language === 'pl' 
-                          ? "Wyszukiwanie dynamiczne wymaga klucza API, ale poniżej znajdziesz polecane ośrodki." 
-                          : "Dynamic search requires an API key, but you can find featured resorts below."}
+                          ? "Wyszukiwanie dowolnych miejscowości wymaga klucza API, ale możesz przeszukać polecane ośrodki poniżej." 
+                          : "Searching for any town requires an API key, but you can search featured resorts below."}
                       </p>
                       <button 
                         onClick={handleSelectKey}
@@ -1924,7 +1931,9 @@ export default function App() {
                     </div>
                     
                     <div className="space-y-2">
-                      {FEATURED_RESORTS.map((resort, idx) => (
+                      {FEATURED_RESORTS
+                        .filter(r => !searchQuery || r.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map((resort, idx) => (
                         <motion.a
                           key={`featured-${idx}`}
                           href={resort.uri}
@@ -1943,6 +1952,11 @@ export default function App() {
                           <ExternalLink className="w-4 h-4 text-zinc-600 group-hover:text-emerald-500 transition-colors" />
                         </motion.a>
                       ))}
+                      {FEATURED_RESORTS.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && searchQuery && (
+                        <div className="text-center py-8 text-zinc-500 italic text-sm">
+                          {t.noResortsFound}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : searchError ? (
